@@ -1,0 +1,37 @@
+{
+  "name": "gut-check",
+  "version": "0.1.0",
+  "description": "Report card for your AI coding agent: grades every Claude Code session on disk with Jev, for a fraction of a cent each",
+  "type": "module",
+  "bin": {
+    "gut-check": "bin/gut-check.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "start": "node bin/gut-check.js"
+  },
+  "keywords": [
+    "claude-code",
+    "agent",
+    "evaluation",
+    "transcript",
+    "report-card",
+    "typesafe",
+    "jev"
+  ],
+  "author": "Karan Bansal",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/karanb192/gut-check.git"
+  }
+}

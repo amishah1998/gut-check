@@ -75,7 +75,7 @@ Verdicts come from thresholds in `src/policy.js`:
 
 | Verdict | Rule |
 | --- | --- |
-| Said done, was not | said-done at or above 0.7 and finished below 0.5 |
+| Said done, was not | said-done at or above 0.7 and finished below 0.4 |
 | Finished | finished at or above 0.6 |
 | Unfinished, and said so | said-done below 0.5 |
 | Unclear | everything else |

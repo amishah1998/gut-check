@@ -1,10 +1,10 @@
-# gut-check
+# said-done
 
 A report card for your AI coding agent.
 
-![The card gut-check prints: tasks that said done without checking the work, the verdict bar, the said-done-was-not count, corrections, models](docs/card.png)
+![The card said-done prints: tasks that said done without checking the work, the verdict bar, the said-done-was-not count, corrections, models](docs/card.png)
 
-Claude Code keeps a diary of every session under `~/.claude/projects`: what you asked, every file it opened, every command it ran, and its final "done" message. Nobody reads those files back. gut-check does, and grades each task:
+Claude Code keeps a diary of every session under `~/.claude/projects`: what you asked, every file it opened, every command it ran, and its final "done" message. Nobody reads those files back. said-done does, and grades each task:
 
 - **Did it check its work before saying done?** The headline: tasks whose last message claimed done with no test, build, validator or read-back after the last change.
 - **Actually finished?** and **Said it was done?** The gap between the two is the flag to reopen.
@@ -18,10 +18,10 @@ It uses [Jev](https://typesafe.ai), a small model that answers yes/no and pick-o
 
 ```sh
 export TYPESAFE_API_KEY=...   # sign up at https://typesafe.ai, then create a key
-npx gut-check --open
+npx said-done --open
 ```
 
-You get a terminal table, `~/.gut-check/report.html` with one box per task, `card.html` with the headline numbers, and `results.json` with every raw probability.
+You get a terminal table, `~/.said-done/report.html` with one box per task, `card.html` with the headline numbers, and `results.json` with every raw probability.
 
 Useful options:
 
@@ -36,12 +36,12 @@ Useful options:
 --png             also write card.png using the machine's Chrome, if one is installed
 ```
 
-Run `gut-check --help` for the full list.
+Run `said-done --help` for the full list.
 
 ## Watch a live session
 
 ```sh
-npx gut-check --watch --notify
+npx said-done --watch --notify
 ```
 
 Keep this running in a second terminal. Each time a task ends in any Claude Code session, one line appears within a couple of seconds:
@@ -50,7 +50,7 @@ Keep this running in a second terminal. Each time a task ends in any Claude Code
 [13:19] my-app 11112222 turn 4: SAID DONE, WAS NOT · finished 26% · said done 98% · missing: add the migration
 ```
 
-A task counts as ended when the model stopped without asking for another tool, or when you typed the next prompt. With `--notify` on macOS, a "said done, was not" verdict also raises a notification. Lines are appended to `~/.gut-check/watch.jsonl`. Nothing is interrupted: this is a second opinion beside the session, not a gate inside it.
+A task counts as ended when the model stopped without asking for another tool, or when you typed the next prompt. With `--notify` on macOS, a "said done, was not" verdict also raises a notification. Lines are appended to `~/.said-done/watch.jsonl`. Nothing is interrupted: this is a second opinion beside the session, not a gate inside it.
 
 ## What leaves your machine
 
@@ -131,7 +131,7 @@ Measured on 2026-09-20 over 109 tasks from 12 sessions on one machine: 45 second
 
 ```sh
 npm test                      # unit tests, no network
-node bin/gut-check.js --dry-run 2 --limit 1
+node bin/said-done.js --dry-run 2 --limit 1
 ```
 
 Zero dependencies. Node 20 or newer.

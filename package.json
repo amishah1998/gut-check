@@ -1,10 +1,10 @@
 {
-  "name": "gut-check",
+  "name": "said-done",
   "version": "0.1.0",
   "description": "Report card for your AI coding agent: grades every Claude Code session on disk with Jev, for a fraction of a cent each",
   "type": "module",
   "bin": {
-    "gut-check": "bin/gut-check.js"
+    "said-done": "bin/said-done.js"
   },
   "files": [
     "bin",
@@ -17,7 +17,7 @@
   },
   "scripts": {
     "test": "node --test test/*.test.js",
-    "start": "node bin/gut-check.js"
+    "start": "node bin/said-done.js"
   },
   "keywords": [
     "claude-code",
@@ -32,6 +32,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/amishah1998/gut-check.git"
+    "url": "git+https://github.com/amishah1998/said-done.git"
   }
 }

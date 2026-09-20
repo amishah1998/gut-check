@@ -9,7 +9,8 @@ const state = { task: "do x and y", requirements: ["do x", "do y"], steps: [], f
 
 test("verdicts", () => {
   assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 1 } }), "gap");
-  assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 3.2 } }), "unclear", "most delivered is not a gap");
+  assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 3.2 } }, "", []), "finished", "most delivered, nothing missing: the share door opens");
+  assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 2.8 } }, "", []), "unclear", "70% delivered is under the door");
   assert.equal(verdict({ completed: { noul: 0.8 }, claimed_done: { noul: 0.9 } }), "finished");
   assert.equal(verdict({ completed: { noul: 0.65 }, claimed_done: { noul: 0.9 } }), "unclear", "finished needs 0.7 without a share");
   assert.equal(verdict({ completed: { noul: 0.55 }, claimed_done: { noul: 0.9 }, done_share: { score: 3.6 } }, "", []), "finished", "second door: 90% delivered, nothing missing");

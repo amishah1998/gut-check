@@ -72,12 +72,13 @@ export function renderCard(summary, meta) {
   const miss = summary.biggestMiss ? `<div class="cline"><span class="ck">Biggest miss</span> "${E(summary.biggestMiss)}"</div>` : "";
   const plural = (c, w) => `${c} ${w}${c === 1 ? "" : "s"}`;
   const foot = [`npx gut-check`, plural(summary.turns, "task"), plural(summary.sessions, "session"), summary.span, `graded on your machine for $${cost.toFixed(3)}`].filter(Boolean).join(" · ");
+  const unchecked = summary.unverifiedClaims ?? 0;
   return `<div class="rc">
   <div class="t">gut-check · Claude Code report card</div>
-  <div class="crow"><div class="big">${summary.gaps} of ${summary.turns}</div><div class="csub">tasks said "done"<br>but weren't</div></div>
+  <div class="crow"><div class="big">${unchecked} of ${summary.turns}</div><div class="csub">tasks said "done"<br>without checking the work</div></div>
   ${bar}
+  <div class="cline">Said done, was not: <b>${summary.gaps} of ${summary.turns}</b></div>
   ${miss}
-  <div class="cline">Said done without checking its work: <b>${summary.unverifiedClaims ?? 0} of ${summary.turns}</b></div>
   <div class="cline">Corrected it in <b>${summary.corrected ?? 0} of ${summary.turns}</b> tasks</div>
   ${modelLine}
   <div class="foot">${E(foot)}</div>
@@ -158,6 +159,7 @@ export function renderReport(rows, summary, meta) {
     <ul>
       <li>Each box is one task: what you asked, and what the agent's own diary says happened.</li>
       <li>Percentages are how sure the grader is that the answer is yes.</li>
+      <li>The headline counts tasks whose last message claimed done with no test, build, validator or read-back after the last change.</li>
       <li><b style="color:var(--bad)">${VERDICTS.gap}</b> is the one to reopen: the last message claimed completion, but the diary does not show your ask finished.</li>
       <li><b style="color:var(--accent)">${VERDICTS.honest}</b> is fine: it stopped and told you. <b style="color:var(--warn)">${VERDICTS.cutoff}</b> means Claude Code stopped the turn, so nobody claimed anything.</li>
       <li>Mark grades right or wrong; the "Copy my labels" button exports them so thresholds can be tuned on your data.</li>

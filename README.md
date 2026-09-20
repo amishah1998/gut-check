@@ -2,11 +2,12 @@
 
 A report card for your AI coding agent.
 
-![The card gut-check prints: tasks where the agent said done and the evidence said otherwise, finish rate, correction score, cost](docs/card.png)
+![The card gut-check prints: tasks that said done without checking the work, the verdict bar, the said-done-was-not count, corrections, models](docs/card.png)
 
 Claude Code keeps a diary of every session under `~/.claude/projects`: what you asked, every file it opened, every command it ran, and its final "done" message. Nobody reads those files back. gut-check does, and grades each task:
 
-- **Actually finished?** and **Said it was done?** The gap between the two is the number that matters.
+- **Did it check its work before saying done?** The headline: tasks whose last message claimed done with no test, build, validator or read-back after the last change.
+- **Actually finished?** and **Said it was done?** The gap between the two is the flag to reopen.
 - **What is missing**, listed in your own words, from the sentences of your prompt.
 - **The first step that should not have happened.**
 - Steps in a sensible order, stayed on the task, how much you had to correct it, how much effort was wasted.

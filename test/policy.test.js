@@ -91,10 +91,11 @@ test("card helpers", async () => {
   assert.equal(biggestMiss([]), null);
   const { renderCard } = await import("../src/report.js");
   const html = renderCard({ turns: 10, sessions: 1, finished: 4, gaps: 1, honest: 5, unclear: 0, corrected: 2, unverifiedClaims: 3, span: "Sep 2026", biggestMiss: "add the migration", byModel: { "claude-opus-5": { turns: 5, finished: 3 }, "claude-sonnet-5": { turns: 5, finished: 1 } }, gradeTokens: 1000 }, { pricePerMtok: 0.042, model: "jev-latest", date: "2026-09-20" });
-  assert.match(html, /1 of 10/);
+  assert.match(html, /3 of 10/);
+  assert.match(html, /Said done, was not: <b>1 of 10/);
   assert.match(html, /class="cbar"/);
   assert.match(html, /Biggest miss/);
-  assert.match(html, /without checking its work: <b>3 of 10/);
+  assert.match(html, /without checking the work/);
   assert.match(html, /Opus 5 finished 3 of 5 · Sonnet 5 finished 1 of 5/);
   assert.match(html, /10 tasks · 1 session · Sep 2026/);
 });

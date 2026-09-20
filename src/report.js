@@ -11,10 +11,10 @@ const CSS = `
 *{box-sizing:border-box} body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 var(--display);-webkit-font-smoothing:antialiased}
 .wrap{max-width:1080px;margin:0 auto;padding:36px 28px 80px}
 h1{font:600 1.7rem/1.2 var(--display);margin:0 0 4px} .sub{color:var(--muted);margin:0 0 22px}
-.top{display:grid;grid-template-columns:420px 1fr;gap:26px;align-items:start;margin-bottom:30px}
+.top{display:grid;grid-template-columns:520px 1fr;gap:26px;align-items:start;margin-bottom:30px}
 .rc{border-radius:14px;background:#1d1c1a;color:#ebe6dc;padding:22px 26px;box-shadow:0 8px 30px rgba(0,0,0,.18)}
 .rc .t{font:600 11px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:#9c968c}
-.rc .big{font:700 48px/1.05 var(--display);letter-spacing:-.02em;margin:10px 0 2px} .rc .s{font-size:14px;color:#c9c3b8;margin-bottom:14px}
+.rc .big{font:700 48px/1.05 var(--display);letter-spacing:-.02em;margin:10px 0 2px;white-space:nowrap} .rc .s{font-size:14px;color:#c9c3b8;margin-bottom:14px}
 .rc .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px} .rc .k{font:700 22px/1.1 var(--display)} .rc .l{font-size:12px;color:#9c968c;margin-top:2px}
 .rc .foot{margin-top:14px;font:600 11px var(--mono);color:#8fd0d9;letter-spacing:.04em}
 .rc .crow{display:flex;align-items:center;gap:16px} .rc .csub{margin-top:8px;color:#c9c3b8;font-size:17px;line-height:1.25}

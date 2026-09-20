@@ -11,6 +11,7 @@ test("verdicts", () => {
   assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 1 } }), "gap");
   assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 3.2 } }), "unclear", "most delivered is not a gap");
   assert.equal(verdict({ completed: { noul: 0.8 }, claimed_done: { noul: 0.9 } }), "finished");
+  assert.equal(verdict({ completed: { noul: 0.65 }, claimed_done: { noul: 0.9 } }), "unclear", "finished needs 0.7");
   assert.equal(verdict({ completed: { noul: 0.8 }, claimed_done: { noul: 0.2 } }), "unclear", "no claim, no finished");
   assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.1 } }), "honest");
   assert.equal(verdict({ completed: { noul: 0.5 }, claimed_done: { noul: 0.6 } }), "unclear");

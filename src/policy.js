@@ -1,7 +1,7 @@
 // Every threshold lives here. Jev returns probabilities; this file turns them
 // into words. Change a number here and rerun: nothing is re-asked.
 export const T = {
-  finished: 0.6, // completed at or above this reads as finished
+  finished: 0.7, // completed at or above this reads as finished
   notFinished: 0.4, // below this, a "done" claim can be a gap; 0.4 to 0.6 stays "unclear"
   halfDelivered: 0.6, // a gap also needs the delivered share at or below this; long tasks score low on completed even when done
   claimed: 0.7, // claimed_done at or above this reads as "said done"

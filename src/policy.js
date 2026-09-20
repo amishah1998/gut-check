@@ -7,7 +7,7 @@ export const T = {
   claimed: 0.7, // claimed_done at or above this reads as "said done"
   saidNotDone: 0.5, // claimed_done below this reads as honest about being unfinished
   finishedClaim: 0.5, // "finished" also needs the final message to claim it; a high completed with no claim is unclear
-  finishedByShare: 0.85, // second door to finished: delivered share at or above this, claimed, and no ask missing
+  finishedByShare: 0.75, // second door to finished: delivered share at or above this, claimed, and no ask missing
   delivered: 0.4, // a requirement below this is listed as missing
   isAsk: 0.5, // a sentence below this is context, not a requirement
   firstWrong: 0.6, // confidence needed before naming a first wrong step

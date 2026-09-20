@@ -78,3 +78,9 @@ test("closed turns: a later prompt or an end_turn stop", () => {
   assert.equal(isClosed(s.turns[0], true), true);
   assert.equal(isClosed(s.turns[2], true), false);
 });
+
+test("cli skips the open last turn unless asked", async () => {
+  const { parseArgs } = await import("../src/cli.js");
+  assert.equal(parseArgs([]).includeOpen, false);
+  assert.equal(parseArgs(["--include-open"]).includeOpen, true);
+});

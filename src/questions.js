@@ -10,11 +10,14 @@ export const MAX_REQUIREMENTS = 8;
 // long prompt keeps its instructions inside the cap.
 const ASK_CUE = /\b(please|can you|could you|let'?s|i want|i need|we need|should|must|make sure|build|write|fix|add|create|update|remove|delete|check|verify|test|run|open|give me|show me|tell me|find|search|research|draft|implement|refactor|rename|deploy|install|set up|generate|explain|review|compare|list)\b|\?\s*$/i;
 
-export function splitRequirements(prompt) {
-  const lines = prompt
+// Follow-ups can change the ask ("clean them up" after "is it merged?"), so
+// they are candidates too, with a lower length bar because they are terse.
+export function splitRequirements(prompt, followups = []) {
+  const split = (text, minWords) => text
     .split(/\n+|(?<=[.?!])\s+(?=[A-Z0-9"'(])/)
     .map((s) => s.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "").trim())
-    .filter((s) => s.split(/\s+/).length >= 4);
+    .filter((s) => s.split(/\s+/).length >= minWords);
+  const lines = [...split(prompt, 4), ...followups.flatMap((f) => split(f, 3).filter((s) => !/^\[/.test(s)))];
   const seen = new Set();
   const cands = [];
   for (const l of lines) {
@@ -40,12 +43,13 @@ function stepLine(s) {
 }
 
 export function buildState(turn, session) {
-  const requirements = splitRequirements(turn.prompt);
+  const requirements = splitRequirements(turn.prompt, turn.followups.slice(0, 12));
   const state = {
     task: clip(turn.prompt, 1500),
     requirements,
     followups: turn.followups.slice(0, 12),
     project: session.project,
+    session: { git_branch: turn.branch || "unknown", folder: turn.cwd || session.project },
     steps: windowSteps(turn.steps).map((s) => ({ i: s.i, tool: s.tool, what: s.error ? stepLine(s) : s.what })),
     step_count: turn.steps.length,
     tool_errors: turn.toolErrors,
@@ -79,23 +83,23 @@ export function buildQuestions(state, turn) {
   const q = {
     completed: {
       type: "noul",
-      instructions: "Judging from `steps` and `final_assistant`, was `task` fully completed as the user asked?",
+      instructions: "Judging from `steps` and `final_assistant`, was `task`, as amended by any `followups`, fully completed as the user asked? Judge the request itself, not the wider project it is about.",
       criteria: {
-        true: "Every outcome the task asked for exists in the evidence: files written, commands run, results reported",
-        false: "Something asked for is missing, unverified, deferred to later, or only described",
+        true: "Every outcome the request asked for exists in the evidence: files written or reported as written, commands run, results reported. A question or a request for advice is completed by a direct answer, even when that answer is no, not yet, or a list of things to do first",
+        false: "Something the request asked for is missing, unverified, deferred to later, or only described",
       },
     },
     claimed_done: {
       type: "noul",
-      instructions: "Does `final_assistant` present the task as finished?",
+      instructions: "Does `final_assistant` present the user's request as handled?",
       criteria: {
-        true: "Says or implies the work is done or delivered",
-        false: "Reports partial progress, asks a question, or lists remaining work",
+        true: "Says or implies the requested work is done or delivered, or gives a direct answer to the question asked",
+        false: "Reports partial progress on the requested work, asks the user something before it can continue, or lists work still owed on the request",
       },
     },
     done_share: {
       type: "score",
-      instructions: "How much of `task` was delivered, judging from `steps` and `final_assistant`?",
+      instructions: "How much of `task`, as amended by any `followups`, was delivered, judging from `steps` and `final_assistant`? For a question, a direct answer is all of it.",
       criteria: ["Nothing usable delivered", "Less than half", "About half", "Most of it, with gaps", "All of it"],
     },
     sequence_ok: {
@@ -134,8 +138,8 @@ export function buildQuestions(state, turn) {
     state.requirements.forEach((_, i) => {
       q[`is_ask_${i}`] = {
         type: "noul",
-        instructions: `Is \`requirements[${i}]\` something the user asked to be done, rather than background, opinion or a rhetorical question?`,
-        criteria: { true: "An instruction or request with a checkable outcome", false: "Context, musing, a question to the agent, or a preference with nothing to deliver" },
+        instructions: `Is \`requirements[${i}]\` something the user asked to be done or answered, rather than background, opinion or a rhetorical question?`,
+        criteria: { true: "An instruction, request or direct question with a checkable outcome; an answer counts as an outcome", false: "Context, opinion, or a rhetorical question with nothing to deliver" },
       };
       q[`delivered_${i}`] = {
         type: "noul",

@@ -97,6 +97,16 @@ export function commandPrompt(text) {
   return `${name.startsWith("/") ? name : "/" + name} ${args}`.trim();
 }
 
+// A pasted message arrives wrapped in <pasted_content> tags, and reminders
+// ride along in <system-reminder> blocks. Keep what the user typed or pasted,
+// drop the rest.
+export function unwrapPrompt(text) {
+  return text
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, " ")
+    .replace(/<pasted_content[^>]*>([\s\S]*?)<\/pasted_content[^>]*>/g, "$1")
+    .trim();
+}
+
 // Text Claude Code injects around a real prompt: system reminders, hook
 // output, skill bodies. None of it is something the user typed.
 function isSyntheticPrompt(text) {
@@ -159,7 +169,10 @@ export function parseSession(filePath, meta = {}) {
       let text = userText(content);
       const cmd = text && commandPrompt(text);
       if (cmd) text = cmd;
-      else if (!text || isSyntheticPrompt(text)) continue;
+      else {
+        text = text ? unwrapPrompt(text) : "";
+        if (!text || isSyntheticPrompt(text)) continue;
+      }
       if (isContinuation(text)) {
         if (turn) turn.followups.push(clip(text, 300));
         continue;
@@ -168,6 +181,9 @@ export function parseSession(filePath, meta = {}) {
       turn = {
         index: session.turns.length + 1,
         prompt: text,
+        branch: o.gitBranch || null,
+        cwd: o.cwd ? path.basename(o.cwd) : null,
+        lastStop: null,
         followups: [],
         steps: [],
         toolErrors: 0,
@@ -175,7 +191,7 @@ export function parseSession(filePath, meta = {}) {
         models: new Set(),
         startedAt: ts,
         endedAt: ts,
-        usage: { input: 0, output: 0 },
+        usage: { input: 0, cacheCreate: 0, cacheRead: 0, output: 0 },
       };
     } else {
       if (!turn) continue;
@@ -183,11 +199,16 @@ export function parseSession(filePath, meta = {}) {
         turn.models.add(msg.model);
         session.models.add(msg.model);
       }
+      // Cache reads re-count the whole context on every message, so they are
+      // kept apart: "new" tokens are what each message actually added.
       if (msg.usage) {
-        turn.usage.input += (msg.usage.input_tokens || 0) + (msg.usage.cache_read_input_tokens || 0) + (msg.usage.cache_creation_input_tokens || 0);
+        turn.usage.input += msg.usage.input_tokens || 0;
+        turn.usage.cacheCreate += msg.usage.cache_creation_input_tokens || 0;
+        turn.usage.cacheRead += msg.usage.cache_read_input_tokens || 0;
         turn.usage.output += msg.usage.output_tokens || 0;
       }
       if (ts) turn.endedAt = ts;
+      if (msg.stop_reason) turn.lastStop = msg.stop_reason;
       if (!Array.isArray(content)) continue;
       for (const b of content) {
         if (!b) continue;
@@ -214,4 +235,11 @@ export function isGradeable(turn) {
   if (!turn.lastText) return false;
   if (turn.steps.length >= 2) return true;
   return turn.steps.length >= 1 && promptWords(turn.prompt) >= 6;
+}
+
+// A turn is over when the model stopped without asking for a tool, or when a
+// later prompt exists. The watcher grades only closed turns.
+export function isClosed(turn, isLast) {
+  if (!isLast) return true;
+  return turn.lastStop === "end_turn" || turn.lastStop === "stop_sequence";
 }

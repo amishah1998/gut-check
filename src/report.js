@@ -67,13 +67,21 @@ export function renderCard(summary, meta) {
 </div>`;
 }
 
+const tok = (v) => (v == null ? "n/a" : Math.round(v).toLocaleString("en-US"));
+
 function groupTable(title, groups, keyLabel) {
   const keys = Object.keys(groups).sort();
   if (!keys.length) return "";
+  const hasTokens = keys.some((k) => groups[k].avgTokens != null);
   return `<h2 class="sec">${E(title)}</h2>
-<table><thead><tr><th>${E(keyLabel)}</th><th>Tasks</th><th>Finished</th><th>Said done, was not</th><th>Corrections (0 to 3)</th></tr></thead><tbody>
-${keys.map((k) => { const g = groups[k]; return `<tr><td>${E(k)}</td><td class="num">${g.turns}</td><td class="num">${g.finished} (${pct(g.finished / g.turns)})</td><td class="num">${g.gaps}</td><td class="num">${g.avgCorrections == null ? "n/a" : g.avgCorrections.toFixed(1)}</td></tr>`; }).join("\n")}
+<table><thead><tr><th>${E(keyLabel)}</th><th>Tasks</th><th>Finished</th><th>Said done, was not</th><th>Corrections (0 to 3)</th>${hasTokens ? "<th>New Claude tokens per task</th>" : ""}</tr></thead><tbody>
+${keys.map((k) => { const g = groups[k]; return `<tr><td>${E(k)}</td><td class="num">${g.turns}</td><td class="num">${g.finished} (${pct(g.finished / g.turns)})</td><td class="num">${g.gaps}</td><td class="num">${g.avgCorrections == null ? "n/a" : g.avgCorrections.toFixed(1)}</td>${hasTokens ? `<td class="num">${tok(g.avgTokens)}</td>` : ""}</tr>`; }).join("\n")}
 </tbody></table>`;
+}
+
+function tokensLine(summary) {
+  if (summary.tokensPerFinished == null && summary.tokensPerGap == null) return "";
+  return `<p class="note">New Claude tokens per task (fresh input, cache writes and output; cache reads excluded), from the transcript's own usage counts: ${tok(summary.tokensPerFinished)} on tasks that finished, ${tok(summary.tokensPerGap)} on tasks that said done but were not.</p>`;
 }
 
 function turnBox(r) {
@@ -139,6 +147,7 @@ export function renderReport(rows, summary, meta) {
     <div class="actions"><button id="copylabels" type="button">Copy my labels</button><span id="labelcount"></span></div>
   </div>
 </div>
+${tokensLine(summary)}
 ${groupTable("By model", summary.byModel, "Model")}
 ${groupTable("By week", summary.byWeek, "Week starting")}
 <h2 class="sec">Every task, one box each</h2>

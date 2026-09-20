@@ -37,6 +37,8 @@ test("gradeTurn and summarize", () => {
   assert.equal(s.sessions, 2);
   assert.deepEqual(Object.keys(s.byModel).sort(), ["m", "n"]);
   assert.deepEqual(Object.keys(s.byWeek), ["2026-08-31"]);
+  assert.equal(s.tokensPerGap, 2);
+  assert.equal(s.byModel.m.avgTokens, 2);
 });
 
 test("askJev retries on 429 then succeeds", async () => {
@@ -54,4 +56,13 @@ test("askJev retries on 429 then succeeds", async () => {
 test("mapLimit keeps order under concurrency", async () => {
   const out = await mapLimit([3, 1, 2], 2, async (x) => { await new Promise((r) => setTimeout(r, x * 5)); return x * 10; });
   assert.deepEqual(out, [30, 10, 20]);
+});
+
+test("watch line and png finder", async () => {
+  const { formatLine } = await import("../src/watch.js");
+  const { findChrome } = await import("../src/png.js");
+  const line = formatLine({ project: "demo", sessionId: "abcdef1234", turn: 2, verdictLabel: "Said done, was not", completed: 0.2, claimedDone: 0.9, missing: ["write the tests"], firstWrong: null });
+  assert.match(line, /demo abcdef12 turn 2: SAID DONE, WAS NOT · finished 20% · said done 90% · missing: write the tests/);
+  const c = findChrome();
+  assert.ok(c === null || typeof c === "string");
 });

@@ -2,14 +2,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseSession, isGradeable, isContinuation, summarizeInput, projectName, commandPrompt } from "../src/transcript.js";
+import { parseSession, isGradeable, isContinuation, summarizeInput, projectName, commandPrompt, isClosed, unwrapPrompt } from "../src/transcript.js";
 
 const fixture = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "session.jsonl");
 
 test("parses a session into turns, keeping short replies inside the task", () => {
   const s = parseSession(fixture, { project: "demo", sessionId: "abc" });
-  assert.equal(s.turns.length, 3);
-  const [t1, t2, t3] = s.turns;
+  assert.equal(s.turns.length, 4);
+  const [t1, t2, t3, t4] = s.turns;
+  assert.equal(t4.prompt, "Please also bump the version and tag the release.");
+  assert.equal(t4.steps.length, 2);
   assert.equal(t3.prompt, "/review the parser change");
   assert.deepEqual(t3.models, ["claude-opus-5"]);
   assert.match(t1.prompt, /^Fix the failing date test/);
@@ -20,6 +22,9 @@ test("parses a session into turns, keeping short replies inside the task", () =>
   assert.match(t1.lastText, /^Done\./);
   assert.deepEqual(t1.models, ["claude-opus-5"]);
   assert.equal(t1.usage.input, 600);
+  assert.equal(t1.branch, "fix/parser-tz");
+  assert.equal(t1.cwd, "app");
+  assert.equal(t1.lastStop, "end_turn");
   assert.match(t2.prompt, /^Now write a README/);
   assert.deepEqual(t2.models, ["claude-sonnet-5"]);
   assert.deepEqual(s.models.sort(), ["claude-opus-5", "claude-sonnet-5"]);
@@ -30,7 +35,7 @@ test("ignores slash-command wrappers and subagent sidechains", () => {
   assert.ok(s.turns.every((t) => !t.prompt.startsWith("<")));
   assert.ok(s.turns.every((t) => !/subagent prompt/.test(t.prompt)));
   assert.ok(s.turns.every((t) => !/design lead/.test(t.prompt)));
-  assert.equal(s.turns.length, 3);
+  assert.equal(s.turns.length, 4);
   assert.ok(s.turns.every((t) => t.prompt !== "/clear"));
   assert.match(s.turns[2].followups[0], /^\[Image: original/);
 });
@@ -47,6 +52,11 @@ test("slash commands reduce to the command line", () => {
   assert.equal(commandPrompt("<command-name>/pr</command-name>\n<command-args>fix</command-args>\nbody"), "/pr fix");
   assert.equal(commandPrompt("<command-name>deploy</command-name>"), "/deploy");
   assert.equal(commandPrompt("plain prompt"), null);
+});
+
+test("pasted messages are unwrapped, reminders dropped", () => {
+  assert.equal(unwrapPrompt("<system-reminder>x</system-reminder>\n<pasted_content id=\"a\">\nhello there\n</pasted_content id=\"a\">"), "hello there");
+  assert.equal(unwrapPrompt("plain"), "plain");
 });
 
 test("continuations", () => {
@@ -67,4 +77,17 @@ test("input summaries", () => {
 test("project names drop the home prefix", () => {
   const home = process.env.HOME.replace(/\//g, "-");
   assert.equal(projectName(`${home}-GitHub-app`), "GitHub-app");
+});
+
+test("closed turns: a later prompt or an end_turn stop", () => {
+  const s = parseSession(fixture, { project: "demo", sessionId: "abc" });
+  assert.equal(isClosed(s.turns[0], false), true);
+  assert.equal(isClosed(s.turns[0], true), true);
+  assert.equal(isClosed(s.turns[2], true), false);
+});
+
+test("cli skips the open last turn unless asked", async () => {
+  const { parseArgs } = await import("../src/cli.js");
+  assert.equal(parseArgs([]).includeOpen, false);
+  assert.equal(parseArgs(["--include-open"]).includeOpen, true);
 });

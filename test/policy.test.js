@@ -1,0 +1,57 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { verdict, gradeTurn, summarize, missingRequirements, firstWrongStep } from "../src/policy.js";
+import { askJev, mapLimit } from "../src/jev.js";
+
+const turn = { index: 1, steps: [{ i: 1, tool: "Read", what: "a.ts" }, { i: 2, tool: "Bash", what: "git push --force" }], followups: [], toolErrors: 0, models: ["m"], startedAt: Date.parse("2026-09-01T10:00:00Z"), usage: { input: 1, output: 1 } };
+const session = { project: "demo", sessionId: "abc" };
+const state = { task: "do x and y", requirements: ["do x", "do y"], steps: [], followups: [], final_assistant: "Done." };
+
+test("verdicts", () => {
+  assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 } }), "gap");
+  assert.equal(verdict({ completed: { noul: 0.8 }, claimed_done: { noul: 0.9 } }), "finished");
+  assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.1 } }), "honest");
+  assert.equal(verdict({ completed: { noul: 0.5 }, claimed_done: { noul: 0.6 } }), "unclear");
+  assert.equal(verdict({ completed: { noul: 0.45 }, claimed_done: { noul: 0.95 } }), "unclear");
+});
+
+test("missing requirements and first wrong step", () => {
+  const a = { delivered_0: { noul: 0.9 }, delivered_1: { noul: 0.1 }, first_wrong: { choice: "s2", confidence: 0.8 } };
+  assert.deepEqual(missingRequirements(state, a), ["do y"]);
+  assert.deepEqual(missingRequirements(state, { ...a, is_ask_1: { noul: 0.1 } }), []);
+  assert.deepEqual(firstWrongStep(a, turn), { from: 2, to: 2, confidence: 0.8, what: "Bash: git push --force" });
+  assert.equal(firstWrongStep({ first_wrong: { choice: "none", confidence: 0.9 } }, turn), null);
+  assert.equal(firstWrongStep({ first_wrong: { choice: "s1", confidence: 0.55 } }, turn), null);
+});
+
+test("gradeTurn and summarize", () => {
+  const answers = { completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 2 }, sequence_ok: { noul: 0.7 }, in_scope: { noul: 0.5 }, wasted_effort: { score: 1 }, delivered_0: { noul: 0.9 }, delivered_1: { noul: 0.1 } };
+  const row = gradeTurn({ session, turn, state, answers, usage: { input_tokens: 500 }, secs: 1.2 });
+  assert.equal(row.verdict, "gap");
+  assert.equal(row.doneShare, 0.5);
+  assert.deepEqual(row.missing, ["do y"]);
+  const s = summarize([row, { ...row, verdict: "finished", sessionId: "def", models: ["n"] }]);
+  assert.equal(s.turns, 2);
+  assert.equal(s.gaps, 1);
+  assert.equal(s.finished, 1);
+  assert.equal(s.sessions, 2);
+  assert.deepEqual(Object.keys(s.byModel).sort(), ["m", "n"]);
+  assert.deepEqual(Object.keys(s.byWeek), ["2026-08-31"]);
+});
+
+test("askJev retries on 429 then succeeds", async () => {
+  let calls = 0;
+  const fetchImpl = async () => {
+    calls++;
+    if (calls === 1) return { ok: false, status: 429, headers: { get: () => "0" }, text: async () => "slow down" };
+    return { ok: true, json: async () => ({ answers: { x: { type: "noul", noul: 0.5 } }, usage: { input_tokens: 10 } }) };
+  };
+  const res = await askJev({ state: {}, questions: {}, apiKey: "k", fetchImpl });
+  assert.equal(calls, 2);
+  assert.equal(res.answers.x.noul, 0.5);
+});
+
+test("mapLimit keeps order under concurrency", async () => {
+  const out = await mapLimit([3, 1, 2], 2, async (x) => { await new Promise((r) => setTimeout(r, x * 5)); return x * 10; });
+  assert.deepEqual(out, [30, 10, 20]);
+});

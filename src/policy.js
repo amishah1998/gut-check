@@ -98,6 +98,12 @@ export function gradeTurn({ session, turn, state, answers, usage, secs }) {
   };
 }
 
+// Fresh input, cache writes and output: what a task added, not what it re-read.
+export function newTokens(r) {
+  const u = r.tokensSpent || {};
+  return (u.input || 0) + (u.cacheCreate || 0) + (u.output || 0);
+}
+
 function mean(xs) {
   const v = xs.filter((x) => typeof x === "number");
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
@@ -115,13 +121,16 @@ export function summarize(rows) {
     avgSequence: mean(rows.map((r) => r.sequenceOk)),
     avgInScope: mean(rows.map((r) => r.inScope)),
     gradeTokens: rows.reduce((a, r) => a + r.gradeTokens, 0),
+    tokensPerFinished: mean(rows.filter((r) => r.verdict === "finished").map(newTokens)),
+    tokensPerGap: mean(rows.filter((r) => r.verdict === "gap").map(newTokens)),
     byModel: {},
     byWeek: {},
   };
   for (const r of rows) {
     for (const m of r.models.length ? r.models : ["unknown"]) {
-      const b = (s.byModel[m] ??= { turns: 0, finished: 0, gaps: 0, corrections: [] });
+      const b = (s.byModel[m] ??= { turns: 0, finished: 0, gaps: 0, corrections: [], tokens: [] });
       b.turns++;
+      b.tokens.push(newTokens(r));
       if (r.verdict === "finished") b.finished++;
       if (r.verdict === "gap") b.gaps++;
       b.corrections.push(r.corrections);
@@ -142,6 +151,7 @@ export function summarize(rows) {
     for (const b of Object.values(group)) {
       b.avgCorrections = mean(b.corrections);
       delete b.corrections;
+      if (b.tokens) { b.avgTokens = mean(b.tokens); delete b.tokens; }
     }
   }
   return s;

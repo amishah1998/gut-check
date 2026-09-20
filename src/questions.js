@@ -46,6 +46,7 @@ export function buildState(turn, session) {
     requirements,
     followups: turn.followups.slice(0, 12),
     project: session.project,
+    session: { git_branch: turn.branch || "unknown", folder: turn.cwd || session.project },
     steps: windowSteps(turn.steps).map((s) => ({ i: s.i, tool: s.tool, what: s.error ? stepLine(s) : s.what })),
     step_count: turn.steps.length,
     tool_errors: turn.toolErrors,

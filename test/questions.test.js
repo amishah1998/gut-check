@@ -21,6 +21,7 @@ test("state is redacted and windowed", () => {
   const s = parseSession(fixture, { project: "demo", sessionId: "abc" });
   const state = buildState(s.turns[1], s);
   assert.match(state.task, /token [\[]redacted[\]]/);
+  assert.deepEqual(buildState(s.turns[0], s).session, { git_branch: "fix/parser-tz", folder: "app" });
   assert.ok(!/abcdefghijklmnop123456/.test(JSON.stringify(state)));
   const many = Array.from({ length: 300 }, (_, i) => ({ i: i + 1, tool: "Bash", what: `cmd ${i}` }));
   const w = windowSteps(many);

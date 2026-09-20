@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseSession, isGradeable, isContinuation, summarizeInput, projectName, commandPrompt } from "../src/transcript.js";
+import { parseSession, isGradeable, isContinuation, summarizeInput, projectName, commandPrompt, isClosed } from "../src/transcript.js";
 
 const fixture = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "session.jsonl");
 
@@ -20,6 +20,9 @@ test("parses a session into turns, keeping short replies inside the task", () =>
   assert.match(t1.lastText, /^Done\./);
   assert.deepEqual(t1.models, ["claude-opus-5"]);
   assert.equal(t1.usage.input, 600);
+  assert.equal(t1.branch, "fix/parser-tz");
+  assert.equal(t1.cwd, "app");
+  assert.equal(t1.lastStop, "end_turn");
   assert.match(t2.prompt, /^Now write a README/);
   assert.deepEqual(t2.models, ["claude-sonnet-5"]);
   assert.deepEqual(s.models.sort(), ["claude-opus-5", "claude-sonnet-5"]);
@@ -67,4 +70,11 @@ test("input summaries", () => {
 test("project names drop the home prefix", () => {
   const home = process.env.HOME.replace(/\//g, "-");
   assert.equal(projectName(`${home}-GitHub-app`), "GitHub-app");
+});
+
+test("closed turns: a later prompt or an end_turn stop", () => {
+  const s = parseSession(fixture, { project: "demo", sessionId: "abc" });
+  assert.equal(isClosed(s.turns[0], false), true);
+  assert.equal(isClosed(s.turns[0], true), true);
+  assert.equal(isClosed(s.turns[2], true), false);
 });

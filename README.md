@@ -32,9 +32,24 @@ Useful options:
 --max-turns 40    at most 40 tasks per session
 --dry-run 3       print exactly what would be sent for 3 tasks, send nothing
 --no-cache        re-grade tasks graded before
+--png             also write card.png using the machine's Chrome, if one is installed
 ```
 
 Run `gut-check --help` for the full list.
+
+## Watch a live session
+
+```sh
+npx gut-check --watch --notify
+```
+
+Keep this running in a second terminal. Each time a task ends in any Claude Code session, one line appears within a couple of seconds:
+
+```
+[13:19] my-app 11112222 turn 4: SAID DONE, WAS NOT · finished 26% · said done 98% · missing: add the migration
+```
+
+A task counts as ended when the model stopped without asking for another tool, or when you typed the next prompt. With `--notify` on macOS, a "said done, was not" verdict also raises a notification. Lines are appended to `~/.gut-check/watch.jsonl`. Nothing is interrupted: this is a second opinion beside the session, not a gate inside it.
 
 ## What leaves your machine
 
@@ -46,7 +61,7 @@ Only what the grader needs, after secret-shaped strings (API keys, bearer tokens
 | Your short follow-ups inside the task ("yes, go ahead") | Tool output, except a 160-character excerpt of an error |
 | One line per step: tool name plus the command, path, pattern or URL | Anything from subagent transcripts |
 | The agent's last message, up to 1,500 characters | Your project's code |
-| The project folder name | Session ids or timestamps |
+| The project folder name, the git branch and the working folder's name | Session ids or timestamps |
 
 `--dry-run` prints the exact payload. TypeSafe states it does not train on requests or responses; their [models page](https://docs.typesafe.ai/models) has the current terms.
 
@@ -82,11 +97,13 @@ Verdicts come from thresholds in `src/policy.js`:
 
 Change a number there and rerun: answers are cached, so nothing is re-asked.
 
+The report also shows, per model and per week, how many tasks finished and how many new Claude tokens each task cost (fresh input, cache writes and output, taken from the transcript's own usage counts; cache reads are excluded because they re-count the whole context on every message).
+
 ## What it is not
 
 - **Not calibrated to you yet.** The probabilities come from Jev's training, not from your sessions. The report has "Was this grade right?" buttons on every box and a "Copy my labels" button. Label thirty tasks and the thresholds can be tuned to where your labels sit. Until then, use the numbers to rank tasks, not to judge one.
 - **Not a test runner.** "Finished" is judged from the diary, not from running your code. If the diary says tests passed, the grader believes it.
-- **Not a live guard.** It reads sessions after the fact. A watcher that grades each task as it lands, and an in-session version that can stop the agent, are next.
+- **Not a live guard.** `--watch` grades each task as it lands but never stops the agent. An in-session version that can is next.
 - English first. Jev is strongest on English prompts.
 
 ## Cost and speed

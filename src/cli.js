@@ -8,6 +8,8 @@ import { buildState, buildQuestions, estimateTokens } from "./questions.js";
 import { askJev, mapLimit, PRICE_PER_MTOK } from "./jev.js";
 import { gradeTurn, summarize, VERDICTS } from "./policy.js";
 import { renderReport, renderCardPage } from "./report.js";
+import { exportPng } from "./png.js";
+import { watch } from "./watch.js";
 
 const HELP = `gut-check: a report card for your AI coding agent
 
@@ -28,7 +30,11 @@ Usage: gut-check [options]
   --root DIR          transcript root (default ~/.claude/projects)
   --dry-run [N]       print exactly what would be sent for the first N tasks, send nothing
   --no-cache          re-ask Jev even for tasks graded before
+  --png               also write card.png using the machine's Chrome, if found
   --open              open the report when done
+  --watch             keep running: grade each task the moment its turn ends, one line each
+  --notify            with --watch on macOS, a notification when a task says done but was not
+  --interval N        with --watch, seconds between checks, default 2
   --help
 
 Needs TYPESAFE_API_KEY in the environment (https://typesafe.ai). Nothing leaves
@@ -37,7 +43,7 @@ and the agent's last message, after secret-shaped strings are redacted.
 `;
 
 export function parseArgs(argv) {
-  const o = { include: [], exclude: [], since: 0, limit: 0, maxTurns: 40, concurrency: 6, model: "jev-latest", out: path.join(os.homedir(), ".gut-check"), root: DEFAULT_ROOT, dryRun: 0, cache: true, open: false, help: false };
+  const o = { include: [], exclude: [], since: 0, limit: 0, maxTurns: 40, concurrency: 6, model: "jev-latest", out: path.join(os.homedir(), ".gut-check"), root: DEFAULT_ROOT, dryRun: 0, cache: true, open: false, png: false, watch: false, notify: false, interval: 2, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -54,6 +60,10 @@ export function parseArgs(argv) {
       case "--dry-run": o.dryRun = argv[i + 1] && /^\d+$/.test(argv[i + 1]) ? Number(next()) : 3; break;
       case "--no-cache": o.cache = false; break;
       case "--open": o.open = true; break;
+      case "--png": o.png = true; break;
+      case "--watch": o.watch = true; break;
+      case "--notify": o.notify = true; break;
+      case "--interval": o.interval = Number(next()); break;
       case "--help": case "-h": o.help = true; break;
       default: throw new Error(`unknown option ${a} (try --help)`);
     }
@@ -82,6 +92,15 @@ function openFile(p) {
 export async function main(argv, { log = console.error, out = console.log } = {}) {
   const opts = parseArgs(argv);
   if (opts.help) { out(HELP); return 0; }
+
+  if (opts.watch) {
+    const apiKey = process.env.TYPESAFE_API_KEY;
+    if (!apiKey) { log("TYPESAFE_API_KEY is not set. Get a key at https://typesafe.ai and export it."); return 2; }
+    const ctrl = new AbortController();
+    process.on("SIGINT", () => { ctrl.abort(); log("\nStopped."); process.exit(0); });
+    await watch(opts, { log, out, apiKey, signal: ctrl.signal });
+    return 0;
+  }
 
   const sessions = discoverSessions({ root: opts.root, include: opts.include, exclude: opts.exclude, sinceDays: opts.since });
   const picked = opts.limit ? sessions.slice(0, opts.limit) : sessions;
@@ -171,6 +190,10 @@ export async function main(argv, { log = console.error, out = console.log } = {}
   out(`${summary.turns} tasks in ${summary.sessions} sessions: ${summary.finished} finished, ${summary.gaps} "${VERDICTS.gap}", ${summary.honest} "${VERDICTS.honest}".`);
   out(`Sent ${sent} requests (${hits} from cache, ${failed} failed) in ${elapsed.toFixed(1)} s, ${summary.gradeTokens.toLocaleString("en-US")} tokens, about $${cost.toFixed(3)}.`);
   out(`Report: ${reportPath}\nCard:   ${cardPath}\nData:   ${jsonPath}`);
+  if (opts.png) {
+    const png = exportPng(cardPath, path.join(opts.out, "card.png"));
+    out(png ? `PNG:    ${png}` : "PNG:    no Chrome found; set GUT_CHECK_CHROME to a Chrome or Chromium binary");
+  }
   if (opts.open) openFile(reportPath);
   return 0;
 }

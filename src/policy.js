@@ -7,6 +7,7 @@ export const T = {
   claimed: 0.7, // claimed_done at or above this reads as "said done"
   saidNotDone: 0.5, // claimed_done below this reads as honest about being unfinished
   finishedClaim: 0.5, // "finished" also needs the final message to claim it; a high completed with no claim is unclear
+  finishedByShare: 0.85, // second door to finished: delivered share at or above this, claimed, and no ask missing
   delivered: 0.4, // a requirement below this is listed as missing
   isAsk: 0.5, // a sentence below this is context, not a requirement
   firstWrong: 0.6, // confidence needed before naming a first wrong step
@@ -25,13 +26,16 @@ export const VERDICTS = {
 // the agent's honesty is possible, so it gets its own label.
 const CUTOFF = /out of usage credits|reached your .{0,40}limit|usage limit|rate limit|\/usage-credits|context window is full|API Error|Request interrupted/i;
 
-export function verdict(a, finalText = "") {
+// "Fully completed" is a strict question that long, multi-part tasks score
+// around 0.6 on even when delivered, so finished has two doors: the strict
+// completed score, or a high delivered share with nothing listed as missing.
+export function verdict(a, finalText = "", missing = []) {
   if (CUTOFF.test(finalText.slice(0, 300))) return "cutoff";
   const completed = a.completed?.noul ?? 0;
   const claimed = a.claimed_done?.noul ?? 0;
-  const share = a.done_share ? a.done_share.score / 4 : 1;
-  if (claimed >= T.claimed && completed < T.notFinished && share <= T.halfDelivered) return "gap";
-  if (completed >= T.finished && claimed >= T.finishedClaim) return "finished";
+  const share = a.done_share ? a.done_share.score / 4 : null;
+  if (claimed >= T.claimed && completed < T.notFinished && (share ?? 1) <= T.halfDelivered) return "gap";
+  if (claimed >= T.finishedClaim && (completed >= T.finished || (share != null && share >= T.finishedByShare && missing.length === 0))) return "finished";
   if (claimed < T.saidNotDone && completed < T.finished) return "honest";
   return "unclear";
 }
@@ -74,7 +78,8 @@ export function firstWrongStep(answers, turn) {
 // One graded turn, flattened for the table, the JSON and the report.
 export function gradeTurn({ session, turn, state, answers, usage, secs }) {
   const a = answers;
-  const kind = verdict(a, state.final_assistant || "");
+  const missing = missingRequirements(state, a);
+  const kind = verdict(a, state.final_assistant || "", missing);
   return {
     project: session.project,
     sessionId: session.sessionId,
@@ -96,7 +101,7 @@ export function gradeTurn({ session, turn, state, answers, usage, secs }) {
     checks: (state.checks || []).length,
     wasted: a.wasted_effort?.score ?? null,
     corrections: a.corrections?.score ?? 0,
-    missing: missingRequirements(state, a),
+    missing,
     firstWrong: firstWrongStep(a, turn),
     verdict: kind,
     verdictLabel: VERDICTS[kind],

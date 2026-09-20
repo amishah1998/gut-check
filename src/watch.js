@@ -54,7 +54,7 @@ export async function watch(opts, { log, out, apiKey, signal }) {
           const r = gradeTurn({ session, turn, state, answers: res.answers, usage: res.usage });
           out(formatLine(r));
           fs.appendFileSync(logFile, JSON.stringify({ at: new Date().toISOString(), ...r, raw: undefined }) + "\n");
-          if (opts.notify && r.verdict === "gap") notify("gut-check", `${r.project}: said done, was not. ${r.missing[0] ? "Missing: " + r.missing[0].slice(0, 80) : ""}`);
+          if (opts.notify && r.verdict === "gap") notify("said-done", `${r.project}: said done, was not. ${r.missing[0] ? "Missing: " + r.missing[0].slice(0, 80) : ""}`);
         } catch (err) {
           log(`  failed: ${key}: ${err.message}`);
           seen.delete(key);

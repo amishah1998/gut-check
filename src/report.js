@@ -71,10 +71,10 @@ export function renderCard(summary, meta) {
   const modelLine = models.length > 1 ? `<div class="cline">${models.map(([k, v]) => `${E(modelName(k))} finished ${v.finished} of ${v.turns}`).join(" · ")}</div>` : "";
   const miss = summary.biggestMiss ? `<div class="cline"><span class="ck">Biggest miss</span> "${E(summary.biggestMiss)}"</div>` : "";
   const plural = (c, w) => `${c} ${w}${c === 1 ? "" : "s"}`;
-  const foot = [`npx gut-check`, plural(summary.turns, "task"), plural(summary.sessions, "session"), summary.span, `graded on your machine for $${cost.toFixed(3)}`].filter(Boolean).join(" · ");
+  const foot = [`npx said-done`, plural(summary.turns, "task"), plural(summary.sessions, "session"), summary.span, `graded on your machine for $${cost.toFixed(3)}`].filter(Boolean).join(" · ");
   const unchecked = summary.unverifiedClaims ?? 0;
   return `<div class="rc">
-  <div class="t">gut-check · Claude Code report card</div>
+  <div class="t">said-done · Claude Code report card</div>
   <div class="crow"><div class="big">${unchecked} of ${summary.turns}</div><div class="csub">tasks said "done"<br>without checking the work</div></div>
   ${bar}
   <div class="cline">Said done, was not: <b>${summary.gaps} of ${summary.turns}</b></div>
@@ -148,10 +148,10 @@ export function renderReport(rows, summary, meta) {
   const sorted = [...rows].sort((a, b) => order[a.verdict] - order[b.verdict] || (b.claimedDone - b.completed) - (a.claimedDone - a.completed));
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gut-check report: ${summary.turns} tasks</title>
+<title>said-done report: ${summary.turns} tasks</title>
 <style>${CSS}</style></head><body><div class="wrap">
 <h1>Your Claude Code report card</h1>
-<p class="sub">${summary.turns} tasks across ${summary.sessions} sessions, graded ${E(meta.date)} by <code>gut-check</code>. Every number is a probability from ${E(meta.model)}; every box shows the diary it was graded from.</p>
+<p class="sub">${summary.turns} tasks across ${summary.sessions} sessions, graded ${E(meta.date)} by <code>said-done</code>. Every number is a probability from ${E(meta.model)}; every box shows the diary it was graded from.</p>
 <div class="top">
   ${renderCard(summary, meta)}
   <div class="how">
@@ -176,7 +176,7 @@ ${sorted.map(turnBox).join("\n")}
 </div>
 <script>
 (function(){
-  var KEY='gutcheck:labels'; var st={}; try{st=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}
+  var KEY='saiddone:labels'; var st={}; try{st=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){}
   function save(){try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){} var n=Object.keys(st).length; document.getElementById('labelcount').textContent=n?n+' labelled':'';}
   document.querySelectorAll('.sess').forEach(function(box){
     var id=box.dataset.id;
@@ -196,5 +196,5 @@ ${sorted.map(turnBox).join("\n")}
 }
 
 export function renderCardPage(summary, meta) {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>gut-check card</title><style>${CSS} body{padding:40px} .rc{max-width:520px}</style></head><body>${renderCard(summary, meta)}</body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>said-done card</title><style>${CSS} body{padding:40px} .rc{max-width:520px}</style></head><body>${renderCard(summary, meta)}</body></html>`;
 }

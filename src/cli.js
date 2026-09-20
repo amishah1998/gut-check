@@ -11,13 +11,13 @@ import { renderReport, renderCardPage } from "./report.js";
 import { exportPng } from "./png.js";
 import { watch } from "./watch.js";
 
-const HELP = `gut-check: a report card for your AI coding agent
+const HELP = `said-done: a report card for your AI coding agent
 
 Reads the transcripts Claude Code keeps under ~/.claude/projects, splits each
 session into tasks, and asks Jev (TypeSafe) whether each task was finished,
 whether the agent said it was, what is missing, and where it first went wrong.
 
-Usage: gut-check [options]
+Usage: said-done [options]
 
   --include a,b       only projects whose name contains one of these
   --exclude a,b       skip projects whose name contains one of these
@@ -26,7 +26,7 @@ Usage: gut-check [options]
   --max-turns N       at most N tasks per session (most recent first), default 40
   --concurrency N     parallel requests, default 6
   --model NAME        Jev model, default jev-latest
-  --out DIR           where to write report.html, card.html, results.json (default ~/.gut-check)
+  --out DIR           where to write report.html, card.html, results.json (default ~/.said-done)
   --root DIR          transcript root (default ~/.claude/projects)
   --dry-run [N]       print exactly what would be sent for the first N tasks, send nothing
   --no-cache          re-ask Jev even for tasks graded before
@@ -44,7 +44,7 @@ and the agent's last message, after secret-shaped strings are redacted.
 `;
 
 export function parseArgs(argv) {
-  const o = { include: [], exclude: [], since: 0, limit: 0, maxTurns: 40, concurrency: 6, model: "jev-latest", out: path.join(os.homedir(), ".gut-check"), root: DEFAULT_ROOT, dryRun: 0, cache: true, open: false, png: false, watch: false, notify: false, interval: 2, includeOpen: false, help: false };
+  const o = { include: [], exclude: [], since: 0, limit: 0, maxTurns: 40, concurrency: 6, model: "jev-latest", out: path.join(os.homedir(), ".said-done"), root: DEFAULT_ROOT, dryRun: 0, cache: true, open: false, png: false, watch: false, notify: false, interval: 2, includeOpen: false, help: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
@@ -195,7 +195,7 @@ export async function main(argv, { log = console.error, out = console.log } = {}
   out(`Report: ${reportPath}\nCard:   ${cardPath}\nData:   ${jsonPath}`);
   if (opts.png) {
     const png = exportPng(cardPath, path.join(opts.out, "card.png"));
-    out(png ? `PNG:    ${png}` : "PNG:    no Chrome found; set GUT_CHECK_CHROME to a Chrome or Chromium binary");
+    out(png ? `PNG:    ${png}` : "PNG:    no Chrome found; set SAID_DONE_CHROME to a Chrome or Chromium binary");
   }
   if (opts.open) openFile(reportPath);
   return 0;

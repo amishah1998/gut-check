@@ -16,7 +16,7 @@ It uses [Jev](https://typesafe.ai), a small model that answers yes/no and pick-o
 ## Run it
 
 ```sh
-export TYPESAFE_API_KEY=...   # https://typesafe.ai
+export TYPESAFE_API_KEY=...   # sign up at https://typesafe.ai, then create a key
 npx gut-check --open
 ```
 
@@ -69,7 +69,7 @@ Use `--exclude` to keep whole projects out. If your work sessions live next to p
 
 ## How a task is graded
 
-A **task** is one prompt you typed plus everything the agent did until your next real prompt. Short replies ("ok", "yes do it", "[Request interrupted]") stay inside the task as follow-ups rather than starting a new one. A task is graded when the agent used at least two tools, or one tool for a prompt of six words or more.
+A **task** is one prompt you typed plus everything the agent did until your next real prompt. Short replies ("ok", "yes do it", "[Request interrupted]") stay inside the task as follow-ups rather than starting a new one, and the grader judges the task as amended by them: "is it merged?" followed by "clean them up" is graded on both. A task is graded when the agent used at least two tools, or one tool for a prompt of six words or more.
 
 Each task is one request to Jev with these questions over the task's state:
 

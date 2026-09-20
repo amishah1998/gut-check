@@ -15,6 +15,7 @@ test("requirements come from the user's own sentences", () => {
   const long = Array.from({ length: 12 }, (_, i) => (i === 10 ? "Please fix the login bug today." : `Background sentence number ${i} here.`)).join(" ");
   assert.ok(splitRequirements(long).includes("Please fix the login bug today."));
   assert.deepEqual(splitRequirements("hi"), ["hi"]);
+  assert.deepEqual(splitRequirements("Are all our changes merged on main?", ["clean them up..", "ok", "[Image #1]"]), ["Are all our changes merged on main?", "clean them up.."]);
 });
 
 test("state is redacted and windowed", () => {
@@ -33,10 +34,11 @@ test("questions follow the state", () => {
   const s = parseSession(fixture, { project: "demo", sessionId: "abc" });
   const state = buildState(s.turns[0], s);
   const q = buildQuestions(state, s.turns[0]);
-  for (const k of ["completed", "claimed_done", "done_share", "sequence_ok", "in_scope", "wasted_effort", "corrections", "first_wrong", "is_ask_0", "delivered_0", "is_ask_1", "delivered_1"]) {
+  for (const k of ["completed", "claimed_done", "done_share", "sequence_ok", "in_scope", "wasted_effort", "corrections", "first_wrong", "is_ask_0", "delivered_0", "is_ask_1", "delivered_1", "is_ask_2", "delivered_2"]) {
     assert.ok(q[k], `missing ${k}`);
   }
   assert.deepEqual(Object.keys(q.first_wrong.criteria), ["s1", "s2", "s3", "none"]);
+  assert.match(q.completed.instructions, /as amended by any `followups`/);
   const q2 = buildQuestions(buildState(s.turns[1], s), s.turns[1]);
   assert.equal(q2.corrections, undefined);
   assert.equal(q2.first_wrong, undefined);

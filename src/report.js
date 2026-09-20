@@ -29,11 +29,11 @@ table{border-collapse:collapse;width:100%;font-size:14px;margin:6px 0 18px;backg
 th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line)} th{font:600 10.5px/1.3 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 td.num{font-variant-numeric:tabular-nums}
 .sess{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:12px;padding:16px 20px;margin:0 0 14px}
-.sess.gap{border-left-color:var(--bad)} .sess.finished{border-left-color:var(--ok)} .sess.honest{border-left-color:var(--accent)} .sess.unclear{border-left-color:var(--warn)}
+.sess.gap{border-left-color:var(--bad)} .sess.finished{border-left-color:var(--ok)} .sess.honest{border-left-color:var(--accent)} .sess.unclear{border-left-color:#9c968c} .sess.cutoff{border-left-color:var(--warn)}
 .head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .proj{font-weight:600} .sid{font:12px var(--mono);color:var(--muted);margin-left:6px}
 .badge{font:700 11px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;padding:6px 10px;border-radius:999px;border:1.5px solid;white-space:nowrap}
-.badge.gap{color:var(--bad);border-color:var(--bad)} .badge.finished{color:var(--ok);border-color:var(--ok)} .badge.honest{color:var(--accent);border-color:var(--accent)} .badge.unclear{color:var(--warn);border-color:var(--warn)}
+.badge.gap{color:var(--bad);border-color:var(--bad)} .badge.finished{color:var(--ok);border-color:var(--ok)} .badge.honest{color:var(--accent);border-color:var(--accent)} .badge.unclear{color:#9c968c;border-color:#9c968c} .badge.cutoff{color:var(--warn);border-color:var(--warn)}
 .task{margin:10px 0 8px;font-size:15px;color:#3a3733}
 .miss{margin:6px 0 10px;padding:8px 12px;background:#fbf1ef;border-left:3px solid var(--bad);border-radius:6px;font-size:14px}
 .miss b{color:var(--bad)} .miss ul{margin:4px 0 0;padding-left:18px}
@@ -62,6 +62,7 @@ export function renderCard(summary, meta) {
     [summary.finished, "#4c9a63", "finished"],
     [summary.gaps, "#c9463d", "said done, wasn't"],
     [summary.honest, "#3c8fa0", "unfinished, said so"],
+    [summary.cutoff ?? 0, "#b0641b", "cut off by a limit"],
     [summary.unclear ?? 0, "#6f6a62", "unclear"],
   ].filter(([c]) => c > 0);
   const bar = `<div class="cbar">${segs.map(([c, col, lab]) => `<i style="width:${(100 * c) / n}%;background:${col}" title="${E(lab)} ${c}"></i>`).join("")}</div>
@@ -142,7 +143,7 @@ function turnBox(r) {
 }
 
 export function renderReport(rows, summary, meta) {
-  const order = { gap: 0, unclear: 1, honest: 2, finished: 3 };
+  const order = { gap: 0, unclear: 1, cutoff: 2, honest: 3, finished: 4 };
   const sorted = [...rows].sort((a, b) => order[a.verdict] - order[b.verdict] || (b.claimedDone - b.completed) - (a.claimedDone - a.completed));
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -158,7 +159,7 @@ export function renderReport(rows, summary, meta) {
       <li>Each box is one task: what you asked, and what the agent's own diary says happened.</li>
       <li>Percentages are how sure the grader is that the answer is yes.</li>
       <li><b style="color:var(--bad)">${VERDICTS.gap}</b> is the one to reopen: the last message claimed completion, but the diary does not show your ask finished.</li>
-      <li><b style="color:var(--accent)">${VERDICTS.honest}</b> is fine: it stopped and told you.</li>
+      <li><b style="color:var(--accent)">${VERDICTS.honest}</b> is fine: it stopped and told you. <b style="color:var(--warn)">${VERDICTS.cutoff}</b> means Claude Code stopped the turn, so nobody claimed anything.</li>
       <li>Mark grades right or wrong; the "Copy my labels" button exports them so thresholds can be tuned on your data.</li>
     </ul>
     <div class="actions"><button id="copylabels" type="button">Copy my labels</button><span id="labelcount"></span></div>

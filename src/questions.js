@@ -65,7 +65,7 @@ export function buildState(turn, session) {
     steps: windowSteps(turn.steps).map((s) => withResult(s, s.check || (typeof s.i === "number" && s.i > n - 3))),
     step_count: n,
     tool_errors: turn.toolErrors,
-    final_assistant: clip(turn.lastText, 1500),
+    final_assistant: clip(turn.lastText, 4000),
   };
   return redactDeep(state);
 }

@@ -8,11 +8,14 @@ const session = { project: "demo", sessionId: "abc" };
 const state = { task: "do x and y", requirements: ["do x", "do y"], steps: [], followups: [], final_assistant: "Done." };
 
 test("verdicts", () => {
-  assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 } }), "gap");
+  assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 1 } }), "gap");
+  assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 3.2 } }), "unclear", "most delivered is not a gap");
   assert.equal(verdict({ completed: { noul: 0.8 }, claimed_done: { noul: 0.9 } }), "finished");
+  assert.equal(verdict({ completed: { noul: 0.8 }, claimed_done: { noul: 0.2 } }), "unclear", "no claim, no finished");
   assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.1 } }), "honest");
   assert.equal(verdict({ completed: { noul: 0.5 }, claimed_done: { noul: 0.6 } }), "unclear");
   assert.equal(verdict({ completed: { noul: 0.45 }, claimed_done: { noul: 0.95 } }), "unclear");
+  assert.equal(verdict({ completed: { noul: 0.9 }, claimed_done: { noul: 0.9 } }, "You're out of usage credits. Run /usage-credits"), "cutoff");
 });
 
 test("missing requirements and first wrong step", () => {
@@ -25,10 +28,10 @@ test("missing requirements and first wrong step", () => {
 });
 
 test("gradeTurn and summarize", () => {
-  const answers = { completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 2 }, verified: { noul: 0.1 }, in_scope: { noul: 0.5 }, wasted_effort: { score: 1 }, delivered_0: { noul: 0.9 }, delivered_1: { noul: 0.1 } };
+  const answers = { completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 1 }, verified: { noul: 0.1 }, in_scope: { noul: 0.5 }, wasted_effort: { score: 1 }, delivered_0: { noul: 0.9 }, delivered_1: { noul: 0.1 } };
   const row = gradeTurn({ session, turn, state, answers, usage: { input_tokens: 500 }, secs: 1.2 });
   assert.equal(row.verdict, "gap");
-  assert.equal(row.doneShare, 0.5);
+  assert.equal(row.doneShare, 0.25);
   assert.deepEqual(row.missing, ["do y"]);
   const s = summarize([row, { ...row, verdict: "finished", sessionId: "def", models: ["n"] }]);
   assert.equal(s.turns, 2);

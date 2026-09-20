@@ -76,6 +76,7 @@ export function renderCard(summary, meta) {
   <div class="crow"><div class="big">${summary.gaps} of ${summary.turns}</div><div class="csub">tasks said "done"<br>but weren't</div></div>
   ${bar}
   ${miss}
+  <div class="cline">Said done without checking its work: <b>${summary.unverifiedClaims ?? 0} of ${summary.turns}</b></div>
   <div class="cline">Corrected it in <b>${summary.corrected ?? 0} of ${summary.turns}</b> tasks</div>
   ${modelLine}
   <div class="foot">${E(foot)}</div>
@@ -118,12 +119,13 @@ function turnBox(r) {
     <div class="g"><span class="q">Actually finished?</span>${bar(r.completed, "c")}<span class="v">${pct(r.completed)} · ${words("finished", r.completed)}</span></div>
     <div class="g"><span class="q">Said it was done?</span>${bar(r.claimedDone, "c")}<span class="v">${pct(r.claimedDone)}</span></div>
     <div class="g"><span class="q">How much got delivered</span>${bar(r.doneShare)}<span class="v">${pct(r.doneShare)}</span></div>
-    <div class="g"><span class="q">Steps in a sensible order?</span>${bar(r.sequenceOk)}<span class="v">${pct(r.sequenceOk)}</span></div>
+    <div class="g"><span class="q">Checked its work first?</span>${bar(r.verified)}<span class="v">${pct(r.verified)} · ${r.checks} check step${r.checks === 1 ? "" : "s"}</span></div>
     <div class="g"><span class="q">Stayed on the task?</span>${bar(r.inScope)}<span class="v">${pct(r.inScope)}</span></div>
     <div class="g"><span class="q">You had to correct it</span><span class="w">${E(words("corrections", r.corrections))}</span><span class="v">${r.followups} follow-up messages</span></div>
     <div class="g"><span class="q">Wasted effort</span><span class="w">${E(words("wasted", r.wasted))}</span><span class="v">${r.steps} steps, ${r.toolErrors} tool errors</span></div>
   </div>
   <details><summary>Show the diary this was graded from</summary>
+    ${r.artifacts.length ? `<p class="lab">Files it created or changed</p><ul class="fu">${r.artifacts.map((a) => `<li>${E(a)}</li>`).join("")}</ul>` : ""}
     <p class="lab">First steps the agent took</p>
     <ol class="steps">${r.firstSteps.map((s) => `<li>${E(s)}</li>`).join("")}</ol>
     <p class="lab">Things you said later</p>
@@ -167,7 +169,7 @@ ${groupTable("By model", summary.byModel, "Model")}
 ${groupTable("By week", summary.byWeek, "Week starting")}
 <h2 class="sec">Every task, one box each</h2>
 ${sorted.map(turnBox).join("\n")}
-<p class="note">Grader: ${E(meta.model)} via TypeSafe. Thresholds live in src/policy.js. "Used the right tools" is recorded in results.json but not shown until it is validated against labelled tasks. A task is one user prompt plus everything the agent did until the next prompt; short replies like "yes, go ahead" stay inside the task.</p>
+<p class="note">Grader: ${E(meta.model)} via TypeSafe. Thresholds live in src/policy.js. A task is one user prompt plus everything the agent did until the next prompt; short replies like "yes, go ahead" stay inside the task.</p>
 </div>
 <script>
 (function(){

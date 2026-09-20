@@ -60,6 +60,8 @@ Only what the grader needs, after secret-shaped strings (API keys, bearer tokens
 | Your prompt for the task, up to 1,500 characters | File contents the agent read or wrote |
 | Your short follow-ups inside the task ("yes, go ahead") | Tool output, except a 160-character excerpt of an error |
 | One line per step: tool name plus the command, path, pattern or URL | Anything from subagent transcripts |
+| Paths of files the task created or changed, including targets of shell redirects | Contents of those files |
+| A 120-character excerpt of the output of test, build and validation commands, and of the last three steps | Other tool output |
 | The agent's last message, up to 1,500 characters | Your project's code |
 | The project folder name, the git branch and the working folder's name | Session ids or timestamps |
 
@@ -78,13 +80,12 @@ Each task is one request to Jev with these questions over the task's state:
 | Was the task fully completed as asked? | probability | Actually finished? |
 | Does the last message present it as finished? | probability | Said it was done? |
 | How much was delivered: nothing, less than half, half, most, all | score 0 to 4 | How much got delivered |
-| Are the steps in a sensible order: understand, change, verify, claim | probability | Steps in a sensible order? |
+| Did it check its own work before the final message: a test, build, validator or read-back after the last change | probability | Checked its work first? |
 | Did it stay within what was asked? | probability | Stayed on the task? |
 | How much did the user have to correct it, from the follow-ups | score 0 to 3 | You had to correct it |
 | How much effort was wasted: retries, loops, detours | score 0 to 2 | Wasted effort |
 | Which step is the first that should not have happened, or none | pick one, with confidence | First step that should not have happened |
 | For each sentence of your prompt: is this an ask, and was it delivered | probability each | Asked for N things, M delivered, missing: … |
-| Did it use appropriate tools (dedicated Read/Edit over shell, subagents for side tasks) | probability | recorded in results.json only, not yet validated |
 
 Verdicts come from thresholds in `src/policy.js`:
 
@@ -96,6 +97,8 @@ Verdicts come from thresholds in `src/policy.js`:
 | Unclear | everything else |
 
 Change a number there and rerun: answers are cached, so nothing is re-asked.
+
+Grades vary a little between runs. On the same 104 tasks, two fresh runs differed by about three tasks per verdict, all of them sitting near a threshold. Treat a single task's verdict as a strong hint, not a fact, and use the labels below to settle the ones that matter.
 
 The report also shows, per model and per week, how many tasks finished and how many new Claude tokens each task cost (fresh input, cache writes and output, taken from the transcript's own usage counts; cache reads are excluded because they re-count the whole context on every message).
 

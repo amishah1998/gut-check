@@ -39,6 +39,37 @@ export function discoverSessions({ root = DEFAULT_ROOT, include = [], exclude = 
   return out.sort((a, b) => b.mtime - a.mtime);
 }
 
+// Commands that check work rather than change it. Their output is the
+// evidence "finished" should rest on, so it is kept for the grader.
+const CHECK = /\b(?:npm|pnpm|yarn|bun)\s+(?:test|run\s+(?:test|build|lint|check|typecheck|validate))\b|\bnode\s+--test\b|\bpytest\b|\bpython3?\s+-m\s+(?:pytest|unittest)\b|\bgo\s+(?:test|build|vet)\b|\bcargo\s+(?:test|build|check|clippy)\b|\bxcodebuild\b|\bswift\s+(?:test|build)\b|\btsc\b|\beslint\b|\bruff\b|\bmypy\b|\bmake\b|\bmvn\b|\bgradle\b|\bclaude\s+plugin\s+validate\b|\bcurl\b[^|]*-w\b|\bgh\s+pr\s+(?:view|checks)\b/;
+
+export function isCheckCommand(cmd) {
+  return CHECK.test(String(cmd || ""));
+}
+
+// Files a shell command creates or changes: redirects, tee, cp and mv
+// targets outside heredoc bodies, plus file writes inside inline Python or
+// Node. A candidate must look like a path, so code fragments never qualify.
+const HEREDOC = /<<-?\s*['"]?(\w+)['"]?[^\n]*\n[\s\S]*?\n\s*\1\b/g;
+const PATHLIKE = /^[\w.\/~$-]+$/;
+export function extractPaths(cmd) {
+  const c = String(cmd || "");
+  const shell = c.replace(HEREDOC, " ");
+  const out = new Set();
+  const add = (raw) => {
+    const p = String(raw || "").replace(/^["']|["']$/g, "");
+    if (!p || !PATHLIKE.test(p) || !/[./]/.test(p) || /^(\/dev\/null|&\d|\d+|\.|\.\.)$/.test(p) || /^[-=]/.test(p)) return;
+    out.add(p.slice(-80));
+  };
+  for (const m of shell.matchAll(/(?<![0-9&<])>>?\s*([^\s;&|<>]+)/g)) add(m[1]);
+  for (const m of shell.matchAll(/\btee\s+(?:-a\s+)?([^\s;&|]+)/g)) add(m[1]);
+  for (const m of shell.matchAll(/\b(?:cp|mv)\s+(?:-\S+\s+)*\S+\s+([^\s;&|]+)/g)) add(m[1]);
+  for (const m of c.matchAll(/open\(\s*['"]([^'"]+)['"]\s*,\s*['"][wa]/g)) add(m[1]);
+  for (const m of c.matchAll(/writeFileSync\(\s*['"]([^'"]+)['"]/g)) add(m[1]);
+  // project files first, scratch and temp paths last
+  return [...out].sort((a, b) => Number(/\/(?:tmp|scratchpad)\//.test(a)) - Number(/\/(?:tmp|scratchpad)\//.test(b)));
+}
+
 export function summarizeInput(name, input) {
   if (!input || typeof input !== "object") return clip(input, 120);
   switch (name) {
@@ -156,11 +187,13 @@ export function parseSession(filePath, meta = {}) {
         for (const b of content) {
           if (b && b.type === "tool_result" && turn) {
             const last = turn.steps[turn.steps.length - 1];
+            const text = typeof b.content === "string" ? b.content : Array.isArray(b.content) ? b.content.map((x) => (x && x.type === "text" ? x.text : "")).join(" ") : JSON.stringify(b.content ?? "");
+            if (last) last.result = clip(text, 160);
             if (b.is_error) {
               turn.toolErrors++;
               if (last) {
                 last.error = true;
-                last.errorText = clip(typeof b.content === "string" ? b.content : JSON.stringify(b.content), 160);
+                last.errorText = clip(text, 160);
               }
             }
           }
@@ -186,6 +219,7 @@ export function parseSession(filePath, meta = {}) {
         lastStop: null,
         followups: [],
         steps: [],
+        artifacts: new Set(),
         toolErrors: 0,
         lastText: "",
         models: new Set(),
@@ -213,7 +247,14 @@ export function parseSession(filePath, meta = {}) {
       for (const b of content) {
         if (!b) continue;
         if (b.type === "tool_use") {
-          turn.steps.push({ i: turn.steps.length + 1, tool: b.name, what: summarizeInput(b.name, b.input), error: false });
+          const step = { i: turn.steps.length + 1, tool: b.name, what: summarizeInput(b.name, b.input), error: false, result: "" };
+          const input = b.input && typeof b.input === "object" ? b.input : {};
+          if (["Write", "Edit", "MultiEdit", "NotebookEdit"].includes(b.name) && input.file_path) turn.artifacts.add(String(input.file_path).slice(-80));
+          if (b.name === "Bash") {
+            for (const f of extractPaths(input.command)) turn.artifacts.add(f);
+            if (isCheckCommand(input.command)) step.check = true;
+          }
+          turn.steps.push(step);
         } else if (b.type === "text" && b.text && b.text.trim()) {
           turn.lastText = b.text;
         }
@@ -221,7 +262,7 @@ export function parseSession(filePath, meta = {}) {
     }
   }
   closeTurn();
-  for (const t of session.turns) t.models = [...t.models];
+  for (const t of session.turns) { t.models = [...t.models]; t.artifacts = [...t.artifacts]; }
   session.models = [...session.models];
   return session;
 }

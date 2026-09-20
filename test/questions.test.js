@@ -34,11 +34,23 @@ test("questions follow the state", () => {
   const s = parseSession(fixture, { project: "demo", sessionId: "abc" });
   const state = buildState(s.turns[0], s);
   const q = buildQuestions(state, s.turns[0]);
-  for (const k of ["completed", "claimed_done", "done_share", "sequence_ok", "in_scope", "wasted_effort", "corrections", "first_wrong", "is_ask_0", "delivered_0", "is_ask_1", "delivered_1", "is_ask_2", "delivered_2"]) {
+  for (const k of ["completed", "claimed_done", "done_share", "verified", "in_scope", "wasted_effort", "corrections", "first_wrong", "is_ask_0", "delivered_0", "is_ask_1", "delivered_1", "is_ask_2", "delivered_2"]) {
     assert.ok(q[k], `missing ${k}`);
   }
   assert.deepEqual(Object.keys(q.first_wrong.criteria), ["s1", "s2", "s3", "none"]);
   assert.match(q.completed.instructions, /as amended by any `followups`/);
+  assert.equal(q.sequence_ok, undefined);
+  assert.equal(q.right_tools, undefined);
+  assert.deepEqual(state.artifacts, ["notes.md", "src/parser.ts"]);
+  assert.equal(state.checks.length, 1);
+  assert.equal(state.checks[0].result, "1 failing");
+  assert.equal(state.checks[0].ok, false);
+  assert.equal(state.steps[1].result, "1 failing");
+  assert.equal(typeof state.steps[0].result, "string"); // three steps: all are within the last three
+  const many = { ...s.turns[0], steps: Array.from({ length: 8 }, (_, i) => ({ i: i + 1, tool: "Bash", what: `cmd ${i}`, error: false, result: `out ${i}` })), artifacts: [] };
+  const st2 = buildState(many, s);
+  assert.equal(st2.steps[0].result, undefined);
+  assert.equal(st2.steps[7].result, "out 7");
   assert.match(q.completed.criteria.true, /direct answer/);
   const q2 = buildQuestions(buildState(s.turns[1], s), s.turns[1]);
   assert.equal(q2.corrections, undefined);

@@ -42,16 +42,28 @@ function stepLine(s) {
   return s.error ? `${base} [error: ${s.errorText || "failed"}]` : base;
 }
 
+// A step's output travels only where it is evidence: checks, and the last
+// three steps, where "it worked" or "it did not" usually shows.
+function withResult(s, keep) {
+  const o = { i: s.i, tool: s.tool, what: s.error ? stepLine(s) : s.what };
+  if (keep && s.result) o.result = clip(s.result, 120);
+  return o;
+}
+
 export function buildState(turn, session) {
   const requirements = splitRequirements(turn.prompt, turn.followups.slice(0, 12));
+  const n = turn.steps.length;
+  const checks = turn.steps.filter((s) => s.check).slice(-6).map((s) => ({ i: s.i, what: clip(s.what, 100), ok: !s.error, result: clip(s.result || "", 120) }));
   const state = {
     task: clip(turn.prompt, 1500),
     requirements,
     followups: turn.followups.slice(0, 12),
     project: session.project,
     session: { git_branch: turn.branch || "unknown", folder: turn.cwd || session.project },
-    steps: windowSteps(turn.steps).map((s) => ({ i: s.i, tool: s.tool, what: s.error ? stepLine(s) : s.what })),
-    step_count: turn.steps.length,
+    artifacts: (turn.artifacts || []).slice(0, 12),
+    checks,
+    steps: windowSteps(turn.steps).map((s) => withResult(s, s.check || (typeof s.i === "number" && s.i > n - 3))),
+    step_count: n,
     tool_errors: turn.toolErrors,
     final_assistant: clip(turn.lastText, 1500),
   };
@@ -85,7 +97,7 @@ export function buildQuestions(state, turn) {
       type: "noul",
       instructions: "Judging from `steps` and `final_assistant`, was `task`, as amended by any `followups`, fully completed as the user asked? Judge the request itself, not the wider project it is about.",
       criteria: {
-        true: "Every outcome the request asked for exists in the evidence: files written or reported as written, commands run, results reported. A question or a request for advice is completed by a direct answer, even when that answer is no, not yet, or a list of things to do first",
+        true: "Every outcome the request asked for exists in the evidence: files in `artifacts`, results in `checks`, commands run, results reported. A question or a request for advice is completed by a direct answer, even when that answer is no, not yet, or a list of things to do first",
         false: "Something the request asked for is missing, unverified, deferred to later, or only described",
       },
     },
@@ -102,17 +114,17 @@ export function buildQuestions(state, turn) {
       instructions: "How much of `task`, as amended by any `followups`, was delivered, judging from `steps` and `final_assistant`? For a question, a direct answer is all of it.",
       criteria: ["Nothing usable delivered", "Less than half", "About half", "Most of it, with gaps", "All of it"],
     },
-    sequence_ok: {
+    verified: {
       type: "noul",
-      instructions: "Are `steps` in a sensible order for `task`: understand before changing, change before verifying, verify before claiming done?",
+      instructions: "Before `final_assistant`, did the agent check its own work: a step after the last change that runs tests, a build or a validator (see `checks`), or reads the produced output back?",
+      criteria: {
+        true: "A check step exists after the last change and its result is consistent with the final message",
+        false: "No check after the last change, or the check failed and the final message ignores it; a task with no changes and a direct answer also counts as false",
+      },
     },
     in_scope: {
       type: "noul",
       instructions: "Did the agent stay within what `task` and `followups` asked for, without unrequested changes or extra deliverables?",
-    },
-    right_tools: {
-      type: "noul",
-      instructions: "Did the agent use appropriate tools in `steps`: dedicated Read, Edit and Grep for files instead of shell, subagents only for genuine side tasks, no needless repetition?",
     },
     wasted_effort: {
       type: "score",

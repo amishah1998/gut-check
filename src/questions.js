@@ -83,23 +83,23 @@ export function buildQuestions(state, turn) {
   const q = {
     completed: {
       type: "noul",
-      instructions: "Judging from `steps` and `final_assistant`, was `task`, as amended by any `followups`, fully completed as the user asked?",
+      instructions: "Judging from `steps` and `final_assistant`, was `task`, as amended by any `followups`, fully completed as the user asked? Judge the request itself, not the wider project it is about.",
       criteria: {
-        true: "Every outcome the task asked for exists in the evidence: files written, commands run, results reported",
-        false: "Something asked for is missing, unverified, deferred to later, or only described",
+        true: "Every outcome the request asked for exists in the evidence: files written or reported as written, commands run, results reported. A question or a request for advice is completed by a direct answer, even when that answer is no, not yet, or a list of things to do first",
+        false: "Something the request asked for is missing, unverified, deferred to later, or only described",
       },
     },
     claimed_done: {
       type: "noul",
-      instructions: "Does `final_assistant` present the task as finished?",
+      instructions: "Does `final_assistant` present the user's request as handled?",
       criteria: {
-        true: "Says or implies the work is done or delivered",
-        false: "Reports partial progress, asks a question, or lists remaining work",
+        true: "Says or implies the requested work is done or delivered, or gives a direct answer to the question asked",
+        false: "Reports partial progress on the requested work, asks the user something before it can continue, or lists work still owed on the request",
       },
     },
     done_share: {
       type: "score",
-      instructions: "How much of `task`, as amended by any `followups`, was delivered, judging from `steps` and `final_assistant`?",
+      instructions: "How much of `task`, as amended by any `followups`, was delivered, judging from `steps` and `final_assistant`? For a question, a direct answer is all of it.",
       criteria: ["Nothing usable delivered", "Less than half", "About half", "Most of it, with gaps", "All of it"],
     },
     sequence_ok: {

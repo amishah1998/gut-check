@@ -39,6 +39,7 @@ test("questions follow the state", () => {
   }
   assert.deepEqual(Object.keys(q.first_wrong.criteria), ["s1", "s2", "s3", "none"]);
   assert.match(q.completed.instructions, /as amended by any `followups`/);
+  assert.match(q.completed.criteria.true, /direct answer/);
   const q2 = buildQuestions(buildState(s.turns[1], s), s.turns[1]);
   assert.equal(q2.corrections, undefined);
   assert.equal(q2.first_wrong, undefined);

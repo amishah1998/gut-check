@@ -97,6 +97,16 @@ export function commandPrompt(text) {
   return `${name.startsWith("/") ? name : "/" + name} ${args}`.trim();
 }
 
+// A pasted message arrives wrapped in <pasted_content> tags, and reminders
+// ride along in <system-reminder> blocks. Keep what the user typed or pasted,
+// drop the rest.
+export function unwrapPrompt(text) {
+  return text
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, " ")
+    .replace(/<pasted_content[^>]*>([\s\S]*?)<\/pasted_content[^>]*>/g, "$1")
+    .trim();
+}
+
 // Text Claude Code injects around a real prompt: system reminders, hook
 // output, skill bodies. None of it is something the user typed.
 function isSyntheticPrompt(text) {
@@ -159,7 +169,10 @@ export function parseSession(filePath, meta = {}) {
       let text = userText(content);
       const cmd = text && commandPrompt(text);
       if (cmd) text = cmd;
-      else if (!text || isSyntheticPrompt(text)) continue;
+      else {
+        text = text ? unwrapPrompt(text) : "";
+        if (!text || isSyntheticPrompt(text)) continue;
+      }
       if (isContinuation(text)) {
         if (turn) turn.followups.push(clip(text, 300));
         continue;

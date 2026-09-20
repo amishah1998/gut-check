@@ -1,4 +1,4 @@
-import { VERDICTS, words } from "./policy.js";
+import { VERDICTS, words, modelName } from "./policy.js";
 
 const E = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const pct = (v) => (v == null ? "n/a" : `${Math.round(v * 100)}%`);
@@ -11,12 +11,16 @@ const CSS = `
 *{box-sizing:border-box} body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 var(--display);-webkit-font-smoothing:antialiased}
 .wrap{max-width:1080px;margin:0 auto;padding:36px 28px 80px}
 h1{font:600 1.7rem/1.2 var(--display);margin:0 0 4px} .sub{color:var(--muted);margin:0 0 22px}
-.top{display:grid;grid-template-columns:420px 1fr;gap:26px;align-items:start;margin-bottom:30px}
+.top{display:grid;grid-template-columns:520px 1fr;gap:26px;align-items:start;margin-bottom:30px}
 .rc{border-radius:14px;background:#1d1c1a;color:#ebe6dc;padding:22px 26px;box-shadow:0 8px 30px rgba(0,0,0,.18)}
 .rc .t{font:600 11px/1 var(--display);letter-spacing:.16em;text-transform:uppercase;color:#9c968c}
-.rc .big{font:700 44px/1.05 var(--display);letter-spacing:-.02em;margin:10px 0 2px} .rc .s{font-size:14px;color:#c9c3b8;margin-bottom:14px}
+.rc .big{font:700 48px/1.05 var(--display);letter-spacing:-.02em;margin:10px 0 2px;white-space:nowrap} .rc .s{font-size:14px;color:#c9c3b8;margin-bottom:14px}
 .rc .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 18px} .rc .k{font:700 22px/1.1 var(--display)} .rc .l{font-size:12px;color:#9c968c;margin-top:2px}
 .rc .foot{margin-top:14px;font:600 11px var(--mono);color:#8fd0d9;letter-spacing:.04em}
+.rc .crow{display:flex;align-items:center;gap:16px} .rc .csub{margin-top:8px;color:#c9c3b8;font-size:17px;line-height:1.25}
+.rc .cbar{display:flex;height:14px;border-radius:999px;overflow:hidden;margin:14px 0 6px;background:#333} .rc .cbar i{display:block;height:100%}
+.rc .clegend{font-size:12px;color:#9c968c;display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px} .rc .clegend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.rc .cline{font-size:15px;margin:6px 0;color:#ebe6dc} .rc .ck{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#9c968c;margin-right:8px}
 .how{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 20px;font-size:15px}
 .how h2{font:600 12px/1 var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
 .how ul{margin:0;padding-left:18px} .how li{margin:5px 0}
@@ -52,18 +56,29 @@ details{margin-top:12px;font-size:14px} summary{cursor:pointer;color:var(--accen
 `;
 
 export function renderCard(summary, meta) {
+  const n = Math.max(1, summary.turns);
   const cost = (summary.gradeTokens * meta.pricePerMtok) / 1e6;
+  const segs = [
+    [summary.finished, "#4c9a63", "finished"],
+    [summary.gaps, "#c9463d", "said done, wasn't"],
+    [summary.honest, "#3c8fa0", "unfinished, said so"],
+    [summary.unclear ?? 0, "#6f6a62", "unclear"],
+  ].filter(([c]) => c > 0);
+  const bar = `<div class="cbar">${segs.map(([c, col, lab]) => `<i style="width:${(100 * c) / n}%;background:${col}" title="${E(lab)} ${c}"></i>`).join("")}</div>
+  <div class="clegend">${segs.map(([c, col, lab]) => `<span><b style="background:${col}"></b>${E(lab)} ${c}</span>`).join(" ")}</div>`;
+  const models = Object.entries(summary.byModel || {}).filter(([k]) => k !== "unknown").sort((a, b) => b[1].turns - a[1].turns).slice(0, 2);
+  const modelLine = models.length > 1 ? `<div class="cline">${models.map(([k, v]) => `${E(modelName(k))} finished ${v.finished} of ${v.turns}`).join(" · ")}</div>` : "";
+  const miss = summary.biggestMiss ? `<div class="cline"><span class="ck">Biggest miss</span> "${E(summary.biggestMiss)}"</div>` : "";
+  const plural = (c, w) => `${c} ${w}${c === 1 ? "" : "s"}`;
+  const foot = [`npx gut-check`, plural(summary.turns, "task"), plural(summary.sessions, "session"), summary.span, `graded on your machine for $${cost.toFixed(3)}`].filter(Boolean).join(" · ");
   return `<div class="rc">
   <div class="t">gut-check · Claude Code report card</div>
-  <div class="big">${summary.gaps} of ${summary.turns}</div>
-  <div class="s">tasks where the agent said "done" and the evidence said otherwise</div>
-  <div class="grid">
-    <div><div class="k">${pct(summary.finished / Math.max(1, summary.turns))}</div><div class="l">of tasks actually finished (${summary.finished} of ${summary.turns})</div></div>
-    <div><div class="k">${summary.avgCorrections == null ? "n/a" : summary.avgCorrections.toFixed(1)} / 3</div><div class="l">how hard you had to correct it (0 none, 3 gave up)</div></div>
-    <div><div class="k">${pct(summary.avgDoneShare)}</div><div class="l">of what you asked for got delivered, on average</div></div>
-    <div><div class="k">$${cost.toFixed(3)}</div><div class="l">what grading ${summary.turns} tasks across ${summary.sessions} sessions cost</div></div>
-  </div>
-  <div class="foot">npx gut-check · graded locally with ${E(meta.model)} · ${E(meta.date)}</div>
+  <div class="crow"><div class="big">${summary.gaps} of ${summary.turns}</div><div class="csub">tasks said "done"<br>but weren't</div></div>
+  ${bar}
+  ${miss}
+  <div class="cline">Corrected it in <b>${summary.corrected ?? 0} of ${summary.turns}</b> tasks</div>
+  ${modelLine}
+  <div class="foot">${E(foot)}</div>
 </div>`;
 }
 

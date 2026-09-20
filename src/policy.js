@@ -104,6 +104,32 @@ export function newTokens(r) {
   return (u.input || 0) + (u.cacheCreate || 0) + (u.output || 0);
 }
 
+function dateSpan(rows) {
+  const ts = rows.map((r) => r.startedAt).filter(Boolean);
+  if (!ts.length) return null;
+  const mon = (t) => new Date(t).toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  const a = new Date(Math.min(...ts)), b = new Date(Math.max(...ts));
+  const ay = a.getUTCFullYear(), by = b.getUTCFullYear();
+  if (ay === by && a.getUTCMonth() === b.getUTCMonth()) return `${mon(a)} ${by}`;
+  return ay === by ? `${mon(a)} to ${mon(b)} ${by}` : `${mon(a)} ${ay} to ${mon(b)} ${by}`;
+}
+
+// The quotable line: a short, clean missing item from a flagged task, not
+// the widest gap, which tends to be a long or messy sentence.
+export function biggestMiss(rows) {
+  const items = rows.filter((r) => r.verdict === "gap").flatMap((r) => r.missing).map((m) => m.replace(/\s+/g, " ").trim()).filter((m) => m.length >= 12 && !/^\[/.test(m));
+  if (!items.length) return null;
+  const clean = items.filter((m) => m.length <= 90);
+  const pool = clean.length ? clean : items;
+  return pool.sort((a, b) => a.length - b.length)[Math.floor(pool.length / 2)];
+}
+
+export function modelName(id) {
+  const m = String(id).replace(/^claude-/, "").replace(/-\d{8}$/, "");
+  const [fam, ...rest] = m.split("-");
+  return `${fam.charAt(0).toUpperCase()}${fam.slice(1)} ${rest.join(".")}`.trim();
+}
+
 function mean(xs) {
   const v = xs.filter((x) => typeof x === "number");
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
@@ -120,6 +146,10 @@ export function summarize(rows) {
     avgCorrections: mean(rows.map((r) => r.corrections)),
     avgSequence: mean(rows.map((r) => r.sequenceOk)),
     avgInScope: mean(rows.map((r) => r.inScope)),
+    unclear: rows.filter((r) => r.verdict === "unclear").length,
+    corrected: rows.filter((r) => (r.corrections ?? 0) >= 0.5).length,
+    span: dateSpan(rows),
+    biggestMiss: biggestMiss(rows),
     gradeTokens: rows.reduce((a, r) => a + r.gradeTokens, 0),
     tokensPerFinished: mean(rows.filter((r) => r.verdict === "finished").map(newTokens)),
     tokensPerGap: mean(rows.filter((r) => r.verdict === "gap").map(newTokens)),

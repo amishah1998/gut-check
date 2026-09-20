@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { verdict, gradeTurn, summarize, missingRequirements, firstWrongStep } from "../src/policy.js";
+import { verdict, gradeTurn, summarize, missingRequirements, firstWrongStep, biggestMiss, modelName } from "../src/policy.js";
 import { askJev, mapLimit } from "../src/jev.js";
 
 const turn = { index: 1, steps: [{ i: 1, tool: "Read", what: "a.ts" }, { i: 2, tool: "Bash", what: "git push --force" }], followups: [], toolErrors: 0, models: ["m"], startedAt: Date.parse("2026-09-01T10:00:00Z"), usage: { input: 1, output: 1 } };
@@ -38,6 +38,10 @@ test("gradeTurn and summarize", () => {
   assert.deepEqual(Object.keys(s.byModel).sort(), ["m", "n"]);
   assert.deepEqual(Object.keys(s.byWeek), ["2026-08-31"]);
   assert.equal(s.tokensPerGap, 2);
+  assert.equal(s.corrected, 0);
+  assert.equal(s.unclear, 0);
+  assert.equal(s.span, "Sep 2026");
+  assert.equal(s.biggestMiss, null);
   assert.equal(s.byModel.m.avgTokens, 2);
 });
 
@@ -65,4 +69,23 @@ test("watch line and png finder", async () => {
   assert.match(line, /demo abcdef12 turn 2: SAID DONE, WAS NOT · finished 20% · said done 90% · missing: write the tests/);
   const c = findChrome();
   assert.ok(c === null || typeof c === "string");
+});
+
+test("card helpers", async () => {
+  assert.equal(modelName("claude-opus-4-8"), "Opus 4.8");
+  assert.equal(modelName("claude-fable-5"), "Fable 5");
+  const rows = [
+    { verdict: "gap", missing: ["a very long missing requirement sentence that goes on and on and on and on and on and on and on and on"] },
+    { verdict: "gap", missing: ["add the migration", "[Image #1]"] },
+    { verdict: "finished", missing: ["ignored because not flagged"] },
+  ];
+  assert.equal(biggestMiss(rows), "add the migration");
+  assert.equal(biggestMiss([]), null);
+  const { renderCard } = await import("../src/report.js");
+  const html = renderCard({ turns: 10, sessions: 1, finished: 4, gaps: 1, honest: 5, unclear: 0, corrected: 2, span: "Sep 2026", biggestMiss: "add the migration", byModel: { "claude-opus-5": { turns: 5, finished: 3 }, "claude-sonnet-5": { turns: 5, finished: 1 } }, gradeTokens: 1000 }, { pricePerMtok: 0.042, model: "jev-latest", date: "2026-09-20" });
+  assert.match(html, /1 of 10/);
+  assert.match(html, /class="cbar"/);
+  assert.match(html, /Biggest miss/);
+  assert.match(html, /Opus 5 finished 3 of 5 · Sonnet 5 finished 1 of 5/);
+  assert.match(html, /10 tasks · 1 session · Sep 2026/);
 });

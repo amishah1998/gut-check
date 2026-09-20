@@ -8,11 +8,18 @@ const session = { project: "demo", sessionId: "abc" };
 const state = { task: "do x and y", requirements: ["do x", "do y"], steps: [], followups: [], final_assistant: "Done." };
 
 test("verdicts", () => {
-  assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 } }), "gap");
+  assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 1 } }), "gap");
+  assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 3.2 } }, "", []), "finished", "most delivered, nothing missing: the share door opens");
+  assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 2.8 } }, "", []), "unclear", "70% delivered is under the door");
   assert.equal(verdict({ completed: { noul: 0.8 }, claimed_done: { noul: 0.9 } }), "finished");
+  assert.equal(verdict({ completed: { noul: 0.65 }, claimed_done: { noul: 0.9 } }), "unclear", "finished needs 0.7 without a share");
+  assert.equal(verdict({ completed: { noul: 0.55 }, claimed_done: { noul: 0.9 }, done_share: { score: 3.6 } }, "", []), "finished", "second door: 90% delivered, nothing missing");
+  assert.equal(verdict({ completed: { noul: 0.55 }, claimed_done: { noul: 0.9 }, done_share: { score: 3.6 } }, "", ["add tests"]), "unclear", "second door closes when something is missing");
+  assert.equal(verdict({ completed: { noul: 0.8 }, claimed_done: { noul: 0.2 } }), "unclear", "no claim, no finished");
   assert.equal(verdict({ completed: { noul: 0.2 }, claimed_done: { noul: 0.1 } }), "honest");
   assert.equal(verdict({ completed: { noul: 0.5 }, claimed_done: { noul: 0.6 } }), "unclear");
   assert.equal(verdict({ completed: { noul: 0.45 }, claimed_done: { noul: 0.95 } }), "unclear");
+  assert.equal(verdict({ completed: { noul: 0.9 }, claimed_done: { noul: 0.9 } }, "You're out of usage credits. Run /usage-credits"), "cutoff");
 });
 
 test("missing requirements and first wrong step", () => {
@@ -25,10 +32,10 @@ test("missing requirements and first wrong step", () => {
 });
 
 test("gradeTurn and summarize", () => {
-  const answers = { completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 2 }, sequence_ok: { noul: 0.7 }, in_scope: { noul: 0.5 }, wasted_effort: { score: 1 }, delivered_0: { noul: 0.9 }, delivered_1: { noul: 0.1 } };
+  const answers = { completed: { noul: 0.2 }, claimed_done: { noul: 0.9 }, done_share: { score: 1 }, verified: { noul: 0.1 }, in_scope: { noul: 0.5 }, wasted_effort: { score: 1 }, delivered_0: { noul: 0.9 }, delivered_1: { noul: 0.1 } };
   const row = gradeTurn({ session, turn, state, answers, usage: { input_tokens: 500 }, secs: 1.2 });
   assert.equal(row.verdict, "gap");
-  assert.equal(row.doneShare, 0.5);
+  assert.equal(row.doneShare, 0.25);
   assert.deepEqual(row.missing, ["do y"]);
   const s = summarize([row, { ...row, verdict: "finished", sessionId: "def", models: ["n"] }]);
   assert.equal(s.turns, 2);
@@ -39,6 +46,7 @@ test("gradeTurn and summarize", () => {
   assert.deepEqual(Object.keys(s.byWeek), ["2026-08-31"]);
   assert.equal(s.tokensPerGap, 2);
   assert.equal(s.corrected, 0);
+  assert.equal(s.unverifiedClaims, 2);
   assert.equal(s.unclear, 0);
   assert.equal(s.span, "Sep 2026");
   assert.equal(s.biggestMiss, null);
@@ -82,10 +90,12 @@ test("card helpers", async () => {
   assert.equal(biggestMiss(rows), "add the migration");
   assert.equal(biggestMiss([]), null);
   const { renderCard } = await import("../src/report.js");
-  const html = renderCard({ turns: 10, sessions: 1, finished: 4, gaps: 1, honest: 5, unclear: 0, corrected: 2, span: "Sep 2026", biggestMiss: "add the migration", byModel: { "claude-opus-5": { turns: 5, finished: 3 }, "claude-sonnet-5": { turns: 5, finished: 1 } }, gradeTokens: 1000 }, { pricePerMtok: 0.042, model: "jev-latest", date: "2026-09-20" });
-  assert.match(html, /1 of 10/);
+  const html = renderCard({ turns: 10, sessions: 1, finished: 4, gaps: 1, honest: 5, unclear: 0, corrected: 2, unverifiedClaims: 3, span: "Sep 2026", biggestMiss: "add the migration", byModel: { "claude-opus-5": { turns: 5, finished: 3 }, "claude-sonnet-5": { turns: 5, finished: 1 } }, gradeTokens: 1000 }, { pricePerMtok: 0.042, model: "jev-latest", date: "2026-09-20" });
+  assert.match(html, /3 of 10/);
+  assert.match(html, /Said done, was not: <b>1 of 10/);
   assert.match(html, /class="cbar"/);
   assert.match(html, /Biggest miss/);
+  assert.match(html, /without checking the work/);
   assert.match(html, /Opus 5 finished 3 of 5 · Sonnet 5 finished 1 of 5/);
   assert.match(html, /10 tasks · 1 session · Sep 2026/);
 });

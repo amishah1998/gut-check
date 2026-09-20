@@ -29,11 +29,11 @@ table{border-collapse:collapse;width:100%;font-size:14px;margin:6px 0 18px;backg
 th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line)} th{font:600 10.5px/1.3 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 td.num{font-variant-numeric:tabular-nums}
 .sess{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--line);border-radius:12px;padding:16px 20px;margin:0 0 14px}
-.sess.gap{border-left-color:var(--bad)} .sess.finished{border-left-color:var(--ok)} .sess.honest{border-left-color:var(--accent)} .sess.unclear{border-left-color:var(--warn)}
+.sess.gap{border-left-color:var(--bad)} .sess.finished{border-left-color:var(--ok)} .sess.honest{border-left-color:var(--accent)} .sess.unclear{border-left-color:#9c968c} .sess.cutoff{border-left-color:var(--warn)}
 .head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .proj{font-weight:600} .sid{font:12px var(--mono);color:var(--muted);margin-left:6px}
 .badge{font:700 11px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;padding:6px 10px;border-radius:999px;border:1.5px solid;white-space:nowrap}
-.badge.gap{color:var(--bad);border-color:var(--bad)} .badge.finished{color:var(--ok);border-color:var(--ok)} .badge.honest{color:var(--accent);border-color:var(--accent)} .badge.unclear{color:var(--warn);border-color:var(--warn)}
+.badge.gap{color:var(--bad);border-color:var(--bad)} .badge.finished{color:var(--ok);border-color:var(--ok)} .badge.honest{color:var(--accent);border-color:var(--accent)} .badge.unclear{color:#9c968c;border-color:#9c968c} .badge.cutoff{color:var(--warn);border-color:var(--warn)}
 .task{margin:10px 0 8px;font-size:15px;color:#3a3733}
 .miss{margin:6px 0 10px;padding:8px 12px;background:#fbf1ef;border-left:3px solid var(--bad);border-radius:6px;font-size:14px}
 .miss b{color:var(--bad)} .miss ul{margin:4px 0 0;padding-left:18px}
@@ -62,6 +62,7 @@ export function renderCard(summary, meta) {
     [summary.finished, "#4c9a63", "finished"],
     [summary.gaps, "#c9463d", "said done, wasn't"],
     [summary.honest, "#3c8fa0", "unfinished, said so"],
+    [summary.cutoff ?? 0, "#b0641b", "cut off by a limit"],
     [summary.unclear ?? 0, "#6f6a62", "unclear"],
   ].filter(([c]) => c > 0);
   const bar = `<div class="cbar">${segs.map(([c, col, lab]) => `<i style="width:${(100 * c) / n}%;background:${col}" title="${E(lab)} ${c}"></i>`).join("")}</div>
@@ -71,10 +72,12 @@ export function renderCard(summary, meta) {
   const miss = summary.biggestMiss ? `<div class="cline"><span class="ck">Biggest miss</span> "${E(summary.biggestMiss)}"</div>` : "";
   const plural = (c, w) => `${c} ${w}${c === 1 ? "" : "s"}`;
   const foot = [`npx gut-check`, plural(summary.turns, "task"), plural(summary.sessions, "session"), summary.span, `graded on your machine for $${cost.toFixed(3)}`].filter(Boolean).join(" · ");
+  const unchecked = summary.unverifiedClaims ?? 0;
   return `<div class="rc">
   <div class="t">gut-check · Claude Code report card</div>
-  <div class="crow"><div class="big">${summary.gaps} of ${summary.turns}</div><div class="csub">tasks said "done"<br>but weren't</div></div>
+  <div class="crow"><div class="big">${unchecked} of ${summary.turns}</div><div class="csub">tasks said "done"<br>without checking the work</div></div>
   ${bar}
+  <div class="cline">Said done, was not: <b>${summary.gaps} of ${summary.turns}</b></div>
   ${miss}
   <div class="cline">Corrected it in <b>${summary.corrected ?? 0} of ${summary.turns}</b> tasks</div>
   ${modelLine}
@@ -118,12 +121,13 @@ function turnBox(r) {
     <div class="g"><span class="q">Actually finished?</span>${bar(r.completed, "c")}<span class="v">${pct(r.completed)} · ${words("finished", r.completed)}</span></div>
     <div class="g"><span class="q">Said it was done?</span>${bar(r.claimedDone, "c")}<span class="v">${pct(r.claimedDone)}</span></div>
     <div class="g"><span class="q">How much got delivered</span>${bar(r.doneShare)}<span class="v">${pct(r.doneShare)}</span></div>
-    <div class="g"><span class="q">Steps in a sensible order?</span>${bar(r.sequenceOk)}<span class="v">${pct(r.sequenceOk)}</span></div>
+    <div class="g"><span class="q">Checked its work first?</span>${bar(r.verified)}<span class="v">${pct(r.verified)} · ${r.checks} check step${r.checks === 1 ? "" : "s"}</span></div>
     <div class="g"><span class="q">Stayed on the task?</span>${bar(r.inScope)}<span class="v">${pct(r.inScope)}</span></div>
     <div class="g"><span class="q">You had to correct it</span><span class="w">${E(words("corrections", r.corrections))}</span><span class="v">${r.followups} follow-up messages</span></div>
     <div class="g"><span class="q">Wasted effort</span><span class="w">${E(words("wasted", r.wasted))}</span><span class="v">${r.steps} steps, ${r.toolErrors} tool errors</span></div>
   </div>
   <details><summary>Show the diary this was graded from</summary>
+    ${r.artifacts.length ? `<p class="lab">Files it created or changed</p><ul class="fu">${r.artifacts.map((a) => `<li>${E(a)}</li>`).join("")}</ul>` : ""}
     <p class="lab">First steps the agent took</p>
     <ol class="steps">${r.firstSteps.map((s) => `<li>${E(s)}</li>`).join("")}</ol>
     <p class="lab">Things you said later</p>
@@ -140,7 +144,7 @@ function turnBox(r) {
 }
 
 export function renderReport(rows, summary, meta) {
-  const order = { gap: 0, unclear: 1, honest: 2, finished: 3 };
+  const order = { gap: 0, unclear: 1, cutoff: 2, honest: 3, finished: 4 };
   const sorted = [...rows].sort((a, b) => order[a.verdict] - order[b.verdict] || (b.claimedDone - b.completed) - (a.claimedDone - a.completed));
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -155,8 +159,9 @@ export function renderReport(rows, summary, meta) {
     <ul>
       <li>Each box is one task: what you asked, and what the agent's own diary says happened.</li>
       <li>Percentages are how sure the grader is that the answer is yes.</li>
+      <li>The headline counts tasks whose last message claimed done with no test, build, validator or read-back after the last change.</li>
       <li><b style="color:var(--bad)">${VERDICTS.gap}</b> is the one to reopen: the last message claimed completion, but the diary does not show your ask finished.</li>
-      <li><b style="color:var(--accent)">${VERDICTS.honest}</b> is fine: it stopped and told you.</li>
+      <li><b style="color:var(--accent)">${VERDICTS.honest}</b> is fine: it stopped and told you. <b style="color:var(--warn)">${VERDICTS.cutoff}</b> means Claude Code stopped the turn, so nobody claimed anything.</li>
       <li>Mark grades right or wrong; the "Copy my labels" button exports them so thresholds can be tuned on your data.</li>
     </ul>
     <div class="actions"><button id="copylabels" type="button">Copy my labels</button><span id="labelcount"></span></div>
@@ -167,7 +172,7 @@ ${groupTable("By model", summary.byModel, "Model")}
 ${groupTable("By week", summary.byWeek, "Week starting")}
 <h2 class="sec">Every task, one box each</h2>
 ${sorted.map(turnBox).join("\n")}
-<p class="note">Grader: ${E(meta.model)} via TypeSafe. Thresholds live in src/policy.js. "Used the right tools" is recorded in results.json but not shown until it is validated against labelled tasks. A task is one user prompt plus everything the agent did until the next prompt; short replies like "yes, go ahead" stay inside the task.</p>
+<p class="note">Grader: ${E(meta.model)} via TypeSafe. Thresholds live in src/policy.js. A task is one user prompt plus everything the agent did until the next prompt; short replies like "yes, go ahead" stay inside the task.</p>
 </div>
 <script>
 (function(){

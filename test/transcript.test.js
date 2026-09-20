@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseSession, isGradeable, isContinuation, summarizeInput, projectName, commandPrompt, isClosed, unwrapPrompt } from "../src/transcript.js";
+import { parseSession, isGradeable, isContinuation, summarizeInput, projectName, commandPrompt, isClosed, unwrapPrompt, extractPaths, isCheckCommand } from "../src/transcript.js";
 
 const fixture = path.join(path.dirname(fileURLToPath(import.meta.url)), "fixtures", "session.jsonl");
 
@@ -19,6 +19,9 @@ test("parses a session into turns, keeping short replies inside the task", () =>
   assert.deepEqual(t1.steps.map((x) => x.tool), ["Read", "Bash", "Edit"]);
   assert.equal(t1.toolErrors, 1);
   assert.equal(t1.steps[1].error, true);
+  assert.equal(t1.steps[1].check, true);
+  assert.equal(t1.steps[1].result, "1 failing");
+  assert.deepEqual(t1.artifacts, ["notes.md", "src/parser.ts"]);
   assert.match(t1.lastText, /^Done\./);
   assert.deepEqual(t1.models, ["claude-opus-5"]);
   assert.equal(t1.usage.input, 600);
@@ -90,4 +93,16 @@ test("cli skips the open last turn unless asked", async () => {
   const { parseArgs } = await import("../src/cli.js");
   assert.equal(parseArgs([]).includeOpen, false);
   assert.equal(parseArgs(["--include-open"]).includeOpen, true);
+});
+
+test("artifacts from shell commands and check detection", () => {
+  assert.deepEqual(extractPaths("python3 gen.py > out/report.html 2>&1 && cp a.png docs/card.png"), ["out/report.html", "docs/card.png"]);
+  assert.deepEqual(extractPaths("cat > x.txt <<EOF\nhi\nEOF"), ["x.txt"]);
+  assert.deepEqual(extractPaths("python3 - <<'EOF'\nopen('/tmp/a.json','w').write('x')\nEOF"), ["/tmp/a.json"]);
+  assert.deepEqual(extractPaths("git status && ls -la"), []);
+  assert.deepEqual(extractPaths("python3 - <<'EOF'\nif x>=0.6: print('<td>{E(r[\"a\"])}</td>')\nopen(\"/Users/me/site/page.html\",\"w\").write(s)\nEOF\ncp out.png /private/tmp/scratchpad/shot.png"), ["/Users/me/site/page.html", "/private/tmp/scratchpad/shot.png"]);
+  assert.equal(isCheckCommand("npm test"), true);
+  assert.equal(isCheckCommand("node --test test/*.test.js"), true);
+  assert.equal(isCheckCommand("xcodebuild -scheme App test"), true);
+  assert.equal(isCheckCommand("git push origin main"), false);
 });

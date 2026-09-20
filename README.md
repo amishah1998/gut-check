@@ -2,11 +2,12 @@
 
 A report card for your AI coding agent.
 
-![The card gut-check prints: tasks where the agent said done and the evidence said otherwise, finish rate, correction score, cost](docs/card.png)
+![The card gut-check prints: tasks that said done without checking the work, the verdict bar, the said-done-was-not count, corrections, models](docs/card.png)
 
 Claude Code keeps a diary of every session under `~/.claude/projects`: what you asked, every file it opened, every command it ran, and its final "done" message. Nobody reads those files back. gut-check does, and grades each task:
 
-- **Actually finished?** and **Said it was done?** The gap between the two is the number that matters.
+- **Did it check its work before saying done?** The headline: tasks whose last message claimed done with no test, build, validator or read-back after the last change.
+- **Actually finished?** and **Said it was done?** The gap between the two is the flag to reopen.
 - **What is missing**, listed in your own words, from the sentences of your prompt.
 - **The first step that should not have happened.**
 - Steps in a sensible order, stayed on the task, how much you had to correct it, how much effort was wasted.
@@ -60,7 +61,9 @@ Only what the grader needs, after secret-shaped strings (API keys, bearer tokens
 | Your prompt for the task, up to 1,500 characters | File contents the agent read or wrote |
 | Your short follow-ups inside the task ("yes, go ahead") | Tool output, except a 160-character excerpt of an error |
 | One line per step: tool name plus the command, path, pattern or URL | Anything from subagent transcripts |
-| The agent's last message, up to 1,500 characters | Your project's code |
+| Paths of files the task created or changed, including targets of shell redirects | Contents of those files |
+| A 120-character excerpt of the output of test, build and validation commands, and of the last three steps | Other tool output |
+| The agent's last message, up to 4,000 characters | Your project's code |
 | The project folder name, the git branch and the working folder's name | Session ids or timestamps |
 
 `--dry-run` prints the exact payload. TypeSafe states it does not train on requests or responses; their [models page](https://docs.typesafe.ai/models) has the current terms.
@@ -78,30 +81,38 @@ Each task is one request to Jev with these questions over the task's state:
 | Was the task fully completed as asked? | probability | Actually finished? |
 | Does the last message present it as finished? | probability | Said it was done? |
 | How much was delivered: nothing, less than half, half, most, all | score 0 to 4 | How much got delivered |
-| Are the steps in a sensible order: understand, change, verify, claim | probability | Steps in a sensible order? |
+| Did it check its own work before the final message: a test, build, validator or read-back after the last change | probability | Checked its work first? |
 | Did it stay within what was asked? | probability | Stayed on the task? |
 | How much did the user have to correct it, from the follow-ups | score 0 to 3 | You had to correct it |
 | How much effort was wasted: retries, loops, detours | score 0 to 2 | Wasted effort |
 | Which step is the first that should not have happened, or none | pick one, with confidence | First step that should not have happened |
 | For each sentence of your prompt: is this an ask, and was it delivered | probability each | Asked for N things, M delivered, missing: … |
-| Did it use appropriate tools (dedicated Read/Edit over shell, subagents for side tasks) | probability | recorded in results.json only, not yet validated |
 
 Verdicts come from thresholds in `src/policy.js`:
 
 | Verdict | Rule |
 | --- | --- |
-| Said done, was not | said-done at or above 0.7 and finished below 0.4 |
-| Finished | finished at or above 0.6 |
-| Unfinished, and said so | said-done below 0.5 |
+| Said done, was not | said-done at or above 0.7, finished below 0.4, and delivered share at or below 0.6 |
+| Finished | said-done at or above 0.5, and either finished at or above 0.7, or delivered share at or above 0.75 with no ask listed as missing |
+| Unfinished, and said so | said-done below 0.5 and finished below 0.7 |
+| Cut off by a limit | the final message is Claude Code's own usage-limit, rate-limit or interruption notice |
 | Unclear | everything else |
 
 Change a number there and rerun: answers are cached, so nothing is re-asked.
 
+Grades vary a little between runs. On the same 104 tasks, two fresh runs differed by about three tasks per verdict, all of them sitting near a threshold. Treat a single task's verdict as a strong hint, not a fact, and use the labels below to settle the ones that matter.
+
 The report also shows, per model and per week, how many tasks finished and how many new Claude tokens each task cost (fresh input, cache writes and output, taken from the transcript's own usage counts; cache reads are excluded because they re-count the whole context on every message).
+
+## How the rules were set
+
+The first rule for "said done, was not" needed only said-done above 0.7 and finished below 0.4. On the author's 104 tasks it flagged 14. A model then read the full transcripts of all 14, not the summaries Jev sees, and judged 13 of the flags unfair: long, multi-part tasks that were in fact delivered, which the completion question rates harshly. The delivered-share question scored most-of-it on every one of them, so the rule now requires half or less delivered as well. Under the new rule the same 104 tasks produce 1 flag, which the reader also judged unfair, so on this data the flag has not yet been shown to be precise; the author's agent rarely claims completion falsely, which is itself the finding. Of 8 sampled "finished" tasks, 7 were right and 1 ended in a usage-limit notice, which is now its own verdict.
+
+Two things follow. First, treat "unclear" as the honest middle, not as a failure: it is where long tasks with long summaries land. Second, label your own tasks: the report has "Was this grade right?" buttons on every box and a "Copy my labels" button, and your labels beat a model's reading of your transcripts.
 
 ## What it is not
 
-- **Not calibrated to you yet.** The probabilities come from Jev's training, not from your sessions. The report has "Was this grade right?" buttons on every box and a "Copy my labels" button. Label thirty tasks and the thresholds can be tuned to where your labels sit. Until then, use the numbers to rank tasks, not to judge one.
+- **Not calibrated to you yet.** The rules above were set on one person's sessions, read by a model. Until you label, use the numbers to rank tasks, not to judge one.
 - **Not a test runner.** "Finished" is judged from the diary, not from running your code. If the diary says tests passed, the grader believes it.
 - **Not a live guard.** `--watch` grades each task as it lands but never stops the agent. An in-session version that can is next.
 - English first. Jev is strongest on English prompts.
